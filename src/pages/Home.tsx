@@ -1,13 +1,15 @@
 import { useEffect, useState } from 'react';
-import { Plus } from 'lucide-react';
+import { Plus, Database } from 'lucide-react';
 import { usePlantStore } from '../store/usePlantStore';
 import { PlantCard } from '../components/PlantCard';
 import { PlantForm } from '../components/PlantForm';
 import { DailyCare } from '../components/DailyCare';
+import { ImportExportModal } from '../components/ImportExportModal';
 
 export function Home() {
   const { plants, records, loadAllData } = usePlantStore();
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isImportExportOpen, setIsImportExportOpen] = useState(false);
   const [, forceUpdate] = useState({});
 
   useEffect(() => {
@@ -37,13 +39,22 @@ export function Home() {
                 记录每一次浇水，见证每一寸生长
               </p>
             </div>
-            <button
-              onClick={() => setIsFormOpen(true)}
-              className="flex items-center gap-2 px-4 py-2.5 bg-sage-500 text-white rounded-xl hover:bg-sage-600 transition-colors shadow-sm"
-            >
-              <Plus className="w-5 h-5" />
-              <span className="hidden sm:inline">添加植物</span>
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setIsImportExportOpen(true)}
+                className="p-2.5 bg-white border border-sage-200 text-sage-600 rounded-xl hover:bg-sage-50 transition-colors"
+                title="数据管理"
+              >
+                <Database className="w-5 h-5" />
+              </button>
+              <button
+                onClick={() => setIsFormOpen(true)}
+                className="flex items-center gap-2 px-4 py-2.5 bg-sage-500 text-white rounded-xl hover:bg-sage-600 transition-colors shadow-sm"
+              >
+                <Plus className="w-5 h-5" />
+                <span className="hidden sm:inline">添加植物</span>
+              </button>
+            </div>
           </div>
         </div>
       </header>
@@ -104,6 +115,12 @@ export function Home() {
       </main>
 
       <PlantForm isOpen={isFormOpen} onClose={() => setIsFormOpen(false)} />
+
+      <ImportExportModal
+        isOpen={isImportExportOpen}
+        onClose={() => setIsImportExportOpen(false)}
+        onImportComplete={loadAllData}
+      />
     </div>
   );
 }
