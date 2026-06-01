@@ -1,15 +1,19 @@
 import { useEffect, useState } from 'react';
-import { Plus, Database } from 'lucide-react';
+import { Plus, Database, LayoutGrid, MapPin } from 'lucide-react';
 import { usePlantStore } from '../store/usePlantStore';
 import { PlantCard } from '../components/PlantCard';
+import { LocationView } from '../components/LocationView';
 import { PlantForm } from '../components/PlantForm';
 import { DailyCare } from '../components/DailyCare';
 import { ImportExportModal } from '../components/ImportExportModal';
+
+type ViewMode = 'grid' | 'location';
 
 export function Home() {
   const { plants, records, loadAllData } = usePlantStore();
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isImportExportOpen, setIsImportExportOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [, forceUpdate] = useState({});
 
   useEffect(() => {
@@ -99,17 +103,48 @@ export function Home() {
           </div>
         ) : (
           <div>
-            <h2 className="text-lg font-serif text-sage-800 mb-4">我的植物</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {plants.map((plant, index) => (
-                <div key={plant.id} style={{ animationDelay: `${index * 0.05}s` }}>
-                  <PlantCard
-                    plant={plant}
-                    latestRecord={getLatestRecord(plant.id)}
-                  />
-                </div>
-              ))}
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-serif text-sage-800">我的植物</h2>
+              <div className="flex items-center gap-1 bg-white rounded-xl p-1 border border-sage-100 shadow-sm">
+                <button
+                  onClick={() => setViewMode('grid')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm transition-colors ${
+                    viewMode === 'grid'
+                      ? 'bg-sage-500 text-white'
+                      : 'text-sage-600 hover:bg-sage-50'
+                  }`}
+                >
+                  <LayoutGrid className="w-4 h-4" />
+                  <span className="hidden sm:inline">网格视图</span>
+                </button>
+                <button
+                  onClick={() => setViewMode('location')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm transition-colors ${
+                    viewMode === 'location'
+                      ? 'bg-sage-500 text-white'
+                      : 'text-sage-600 hover:bg-sage-50'
+                  }`}
+                >
+                  <MapPin className="w-4 h-4" />
+                  <span className="hidden sm:inline">位置视图</span>
+                </button>
+              </div>
             </div>
+
+            {viewMode === 'grid' ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                {plants.map((plant, index) => (
+                  <div key={plant.id} style={{ animationDelay: `${index * 0.05}s` }}>
+                    <PlantCard
+                      plant={plant}
+                      latestRecord={getLatestRecord(plant.id)}
+                    />
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <LocationView plants={plants} records={records} />
+            )}
           </div>
         )}
       </main>
