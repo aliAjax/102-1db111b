@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Plant, PlantRecord } from '../types';
+import type { Plant, PlantRecord, GrowthPhoto } from '../types';
 import {
   loadData,
   addPlant as storageAddPlant,
@@ -10,6 +10,10 @@ import {
   deleteRecord as storageDeleteRecord,
   getRecordsByPlantId,
   getTodayString,
+  addGrowthPhoto as storageAddGrowthPhoto,
+  getGrowthPhotosByPlantId as storageGetGrowthPhotos,
+  deleteGrowthPhoto as storageDeleteGrowthPhoto,
+  deleteGrowthPhotosByPlantId as storageDeleteGrowthPhotosByPlantId,
 } from '../utils/storage';
 
 export interface CareTask {
@@ -24,6 +28,7 @@ export interface CareTask {
 interface PlantStore {
   plants: Plant[];
   records: PlantRecord[];
+  growthPhotos: GrowthPhoto[];
   isLoaded: boolean;
   
   loadAllData: () => void;
@@ -40,11 +45,16 @@ interface PlantStore {
   
   getTodayCareTasks: () => CareTask[];
   completeCareTask: (plantId: string, taskType: 'water' | 'fertilize') => void;
+
+  loadGrowthPhotos: (plantId: string) => Promise<void>;
+  addGrowthPhoto: (photo: Omit<GrowthPhoto, 'id' | 'createdAt'>) => Promise<GrowthPhoto>;
+  deleteGrowthPhoto: (id: string, plantId: string) => Promise<void>;
 }
 
 export const usePlantStore = create<PlantStore>((set, get) => ({
   plants: [],
   records: [],
+  growthPhotos: [],
   isLoaded: false,
 
   loadAllData: () => {
@@ -74,9 +84,11 @@ export const usePlantStore = create<PlantStore>((set, get) => ({
 
   deletePlant: (id) => {
     storageDeletePlant(id);
+    storageDeleteGrowthPhotosByPlantId(id);
     set((state) => ({
       plants: state.plants.filter((p) => p.id !== id),
       records: state.records.filter((r) => r.plantId !== id),
+      growthPhotos: state.growthPhotos.filter((p) => p.plantId !== id),
     }));
   },
 
@@ -191,5 +203,30 @@ export const usePlantStore = create<PlantStore>((set, get) => ({
         notes: '',
       });
     }
+  },
+
+  loadGrowthPhotos: async (plantId: string) => {
+    const photos = await storageGetGrowthPhotos(plantId);
+    set((state) => ({
+      growthPhotos: [
+        ...state.growthPhotos.filter((p) => p.plantId !== plantId),
+        ...photos,
+      ],
+    }));
+  },
+
+  addGrowthPhoto: async (photo: Omit<GrowthPhoto, 'id' | 'createdAt'>) => {
+    const newPhoto = await storageAddGrowthPhoto(photo);
+    set((state) => ({
+      growthPhotos: [...state.growthPhotos, newPhoto],
+    }));
+    return newPhoto;
+  },
+
+  deleteGrowthPhoto: async (id: string, plantId: string) => {
+    await storageDeleteGrowthPhoto(id);
+    set((state) => ({
+      growthPhotos: state.growthPhotos.filter((p) => p.id !== id),
+    }));
   },
 }));

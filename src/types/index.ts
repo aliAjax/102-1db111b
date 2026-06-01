@@ -27,6 +27,15 @@ export interface AppData {
   records: PlantRecord[];
 }
 
+export interface GrowthPhoto {
+  id: string;
+  plantId: string;
+  date: string;
+  photoDataUrl: string;
+  note: string;
+  createdAt: string;
+}
+
 export const LEAF_STATUS_LABELS: { [key in LeafStatus]: string } = {
   healthy: '健康',
   yellowing: '发黄',

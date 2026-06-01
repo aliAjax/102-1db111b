@@ -8,12 +8,13 @@ import { CalendarHeatmap } from '../components/CalendarHeatmap';
 import { RecordForm } from '../components/RecordForm';
 import { PlantForm } from '../components/PlantForm';
 import { DayDetails } from '../components/DayDetails';
+import { GrowthAlbum } from '../components/GrowthAlbum';
 import type { PlantRecord } from '../types';
 
 export function PlantDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { getPlantById, records, deletePlant, loadAllData } = usePlantStore();
+  const { getPlantById, records, deletePlant, loadAllData, loadGrowthPhotos } = usePlantStore();
   
   const [isRecordFormOpen, setIsRecordFormOpen] = useState(false);
   const [isPlantFormOpen, setIsPlantFormOpen] = useState(false);
@@ -24,6 +25,12 @@ export function PlantDetail() {
   useEffect(() => {
     loadAllData();
   }, [loadAllData]);
+
+  useEffect(() => {
+    if (id) {
+      loadGrowthPhotos(id);
+    }
+  }, [id, loadGrowthPhotos]);
 
   const plant = id ? getPlantById(id) : undefined;
   const plantRecords = records
@@ -152,6 +159,12 @@ export function PlantDetail() {
           </div>
           <Timeline records={plantRecords} onEditRecord={handleEditRecord} />
         </div>
+
+        {id && (
+          <div className="mt-6">
+            <GrowthAlbum plantId={id} records={plantRecords} />
+          </div>
+        )}
       </main>
 
       <RecordForm
