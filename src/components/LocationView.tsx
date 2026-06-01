@@ -1,6 +1,7 @@
 import { MapPin, Calendar, Droplets, ChevronDown, ChevronRight } from 'lucide-react';
 import { useState } from 'react';
 import { PlantCard } from './PlantCard';
+import { getTodayString } from '../utils/storage';
 import type { Plant, PlantRecord } from '../types';
 
 interface LocationViewProps {
@@ -24,11 +25,6 @@ export function LocationView({ plants, records }: LocationViewProps) {
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
     return `${date.getMonth() + 1}月${date.getDate()}日`;
-  };
-
-  const getTodayString = () => {
-    const today = new Date();
-    return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
   };
 
   const getLatestRecord = (plantId: string) => {
