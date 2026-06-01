@@ -32,14 +32,21 @@ export function CalendarHeatmap({ records, onDateClick }: CalendarHeatmapProps) 
   const getActivityLevel = (day: number) => {
     const dayRecords = getRecordsForDate(day);
     if (dayRecords.length === 0) return 0;
-    const activities = dayRecords.reduce((count, r) => {
-      return count + (r.watered ? 1 : 0) + (r.fertilized ? 1 : 0) + (r.height > 0 ? 1 : 0);
-    }, 0);
-    return Math.min(activities + (dayRecords[0]?.leafStatus ? 1 : 0), 4);
+    let wateredCount = 0;
+    let fertilizedCount = 0;
+    for (const r of dayRecords) {
+      if (r.watered) wateredCount++;
+      if (r.fertilized) fertilizedCount++;
+    }
+    const careCount = wateredCount + fertilizedCount;
+    if (careCount === 0) return 1;
+    if (careCount === 1) return 2;
+    if (careCount === 2) return 3;
+    return 4;
   };
 
   const getBgColor = (level: number) => {
-    const colors = ['bg-sage-50', 'bg-sage-200', 'bg-sage-300', 'bg-sage-400', 'bg-sage-500'];
+    const colors = ['bg-cream-300', 'bg-sage-100', 'bg-sage-200', 'bg-sage-400', 'bg-sage-500'];
     return colors[level];
   };
 

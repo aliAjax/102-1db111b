@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Plant, PlantRecord, LeafStatus } from '../types';
+import type { Plant, PlantRecord } from '../types';
 import {
   loadData,
   addPlant as storageAddPlant,
