@@ -15,6 +15,8 @@ export function PlantForm({ isOpen, onClose, editPlant }: PlantFormProps) {
   const [species, setSpecies] = useState('');
   const [location, setLocation] = useState('');
   const [notes, setNotes] = useState('');
+  const [wateringInterval, setWateringInterval] = useState('7');
+  const [fertilizingInterval, setFertilizingInterval] = useState('30');
 
   useEffect(() => {
     if (editPlant) {
@@ -22,11 +24,15 @@ export function PlantForm({ isOpen, onClose, editPlant }: PlantFormProps) {
       setSpecies(editPlant.species);
       setLocation(editPlant.location);
       setNotes(editPlant.notes);
+      setWateringInterval(editPlant.wateringInterval?.toString() || '7');
+      setFertilizingInterval(editPlant.fertilizingInterval?.toString() || '30');
     } else {
       setName('');
       setSpecies('');
       setLocation('');
       setNotes('');
+      setWateringInterval('7');
+      setFertilizingInterval('30');
     }
   }, [editPlant, isOpen]);
 
@@ -35,9 +41,23 @@ export function PlantForm({ isOpen, onClose, editPlant }: PlantFormProps) {
     if (!name.trim()) return;
 
     if (editPlant) {
-      updatePlant(editPlant.id, { name, species, location, notes });
+      updatePlant(editPlant.id, {
+        name,
+        species,
+        location,
+        notes,
+        wateringInterval: parseInt(wateringInterval) || 7,
+        fertilizingInterval: parseInt(fertilizingInterval) || 30,
+      });
     } else {
-      addPlant({ name, species, location, notes });
+      addPlant({
+        name,
+        species,
+        location,
+        notes,
+        wateringInterval: parseInt(wateringInterval) || 7,
+        fertilizingInterval: parseInt(fertilizingInterval) || 30,
+      });
     }
     onClose();
   };
@@ -94,6 +114,32 @@ export function PlantForm({ isOpen, onClose, editPlant }: PlantFormProps) {
               placeholder="例如：客厅窗台"
               className="w-full px-4 py-3 bg-white border border-sage-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-sage-400 focus:border-transparent transition-all"
             />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-sage-700 mb-2">
+                浇水间隔 (天)
+              </label>
+              <input
+                type="number"
+                value={wateringInterval}
+                onChange={(e) => setWateringInterval(e.target.value)}
+                min="1"
+                className="w-full px-4 py-3 bg-white border border-sage-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-sage-400 focus:border-transparent transition-all"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-sage-700 mb-2">
+                施肥间隔 (天)
+              </label>
+              <input
+                type="number"
+                value={fertilizingInterval}
+                onChange={(e) => setFertilizingInterval(e.target.value)}
+                min="1"
+                className="w-full px-4 py-3 bg-white border border-sage-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-sage-400 focus:border-transparent transition-all"
+              />
+            </div>
           </div>
           <div>
             <label className="block text-sm font-medium text-sage-700 mb-2">

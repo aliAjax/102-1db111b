@@ -3,14 +3,21 @@ import { Plus } from 'lucide-react';
 import { usePlantStore } from '../store/usePlantStore';
 import { PlantCard } from '../components/PlantCard';
 import { PlantForm } from '../components/PlantForm';
+import { DailyCare } from '../components/DailyCare';
 
 export function Home() {
   const { plants, records, loadAllData } = usePlantStore();
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [, forceUpdate] = useState({});
 
   useEffect(() => {
     loadAllData();
   }, [loadAllData]);
+
+  useEffect(() => {
+    const interval = setInterval(() => forceUpdate({}), 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   const getLatestRecord = (plantId: string) => {
     const plantRecords = records
@@ -42,6 +49,12 @@ export function Home() {
       </header>
 
       <main className="container py-8">
+        {plants.length > 0 && (
+          <div className="mb-8">
+            <DailyCare />
+          </div>
+        )}
+
         {plants.length === 0 ? (
           <div className="text-center py-20">
             <div className="w-20 h-20 bg-sage-100 rounded-2xl flex items-center justify-center mx-auto mb-6">
@@ -74,15 +87,18 @@ export function Home() {
             </button>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {plants.map((plant, index) => (
-              <div key={plant.id} style={{ animationDelay: `${index * 0.05}s` }}>
-                <PlantCard
-                  plant={plant}
-                  latestRecord={getLatestRecord(plant.id)}
-                />
-              </div>
-            ))}
+          <div>
+            <h2 className="text-lg font-serif text-sage-800 mb-4">我的植物</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {plants.map((plant, index) => (
+                <div key={plant.id} style={{ animationDelay: `${index * 0.05}s` }}>
+                  <PlantCard
+                    plant={plant}
+                    latestRecord={getLatestRecord(plant.id)}
+                  />
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </main>

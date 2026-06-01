@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Plus, Sprout, MapPin, Pencil, Trash2 } from 'lucide-react';
+import { ArrowLeft, Plus, Sprout, MapPin, Pencil, Trash2, Droplets, Leaf } from 'lucide-react';
 import { usePlantStore } from '../store/usePlantStore';
 import { Timeline } from '../components/Timeline';
 import { HeightChart } from '../components/HeightChart';
@@ -115,6 +115,16 @@ export function PlantDetail() {
               {plant.notes && (
                 <p className="text-sm text-sage-500 mt-2">{plant.notes}</p>
               )}
+              <div className="flex flex-wrap gap-3 mt-3">
+                <span className="inline-flex items-center gap-1.5 text-sm text-blue-600 bg-blue-50 px-3 py-1.5 rounded-full">
+                  <Droplets className="w-4 h-4" />
+                  每 {plant.wateringInterval || 7} 天浇水
+                </span>
+                <span className="inline-flex items-center gap-1.5 text-sm text-amber-600 bg-amber-50 px-3 py-1.5 rounded-full">
+                  <Leaf className="w-4 h-4" />
+                  每 {plant.fertilizingInterval || 30} 天施肥
+                </span>
+              </div>
             </div>
           </div>
         </div>

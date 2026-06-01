@@ -5,6 +5,8 @@ export interface Plant {
   location: string;
   notes: string;
   createdAt: string;
+  wateringInterval: number;
+  fertilizingInterval: number;
 }
 
 export type LeafStatus = 'healthy' | 'yellowing' | 'wilting' | 'new_growth' | '';

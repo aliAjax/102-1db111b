@@ -33,6 +33,8 @@ export const saveData = (data: AppData): void => {
 export const addPlant = (plant: Omit<Plant, 'id' | 'createdAt'>): Plant => {
   const data = loadData();
   const newPlant: Plant = {
+    wateringInterval: 7,
+    fertilizingInterval: 30,
     ...plant,
     id: generateId(),
     createdAt: getTodayString(),
