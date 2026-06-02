@@ -5,8 +5,6 @@ import { usePlantStore } from '../store/usePlantStore';
 import { LEAF_STATUS_LABELS } from '../types';
 import type { LeafStatus, PlantRecord } from '../types';
 
-const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
-
 interface PlantGrowth {
   plantId: string;
   plantName: string;
@@ -36,14 +34,16 @@ export function CareStats() {
   }, [loadAllData]);
 
   const stats = useMemo(() => {
-    const now = new Date();
-    const thirtyDaysAgo = new Date(now.getTime() - THIRTY_DAYS_MS);
-    thirtyDaysAgo.setHours(0, 0, 0, 0);
+    const dateList: string[] = [];
+    for (let i = 29; i >= 0; i--) {
+      const d = getDaysAgo(i);
+      dateList.push(
+        `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+      );
+    }
+    const dateSet = new Set(dateList);
 
-    const recentRecords = records.filter((r: PlantRecord) => {
-      const d = new Date(r.date);
-      return d >= thirtyDaysAgo && d <= now;
-    });
+    const recentRecords = records.filter((r: PlantRecord) => dateSet.has(r.date));
 
     const waterCount = recentRecords.filter((r: PlantRecord) => r.watered).length;
     const fertilizeCount = recentRecords.filter((r: PlantRecord) => r.fertilized).length;
@@ -86,19 +86,18 @@ export function CareStats() {
 
     const waterByDay: { date: string; count: number }[] = [];
     const fertilizeByDay: { date: string; count: number }[] = [];
-    for (let i = 29; i >= 0; i--) {
-      const d = getDaysAgo(i);
-      const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    for (const dateStr of dateList) {
       const dayRecords = recentRecords.filter((r: PlantRecord) => r.date === dateStr);
       waterByDay.push({ date: dateStr, count: dayRecords.filter((r: PlantRecord) => r.watered).length });
       fertilizeByDay.push({ date: dateStr, count: dayRecords.filter((r: PlantRecord) => r.fertilized).length });
     }
 
-    return { waterCount, fertilizeCount, leafDistribution, leafTotal, growthData, recentRecords, waterByDay, fertilizeByDay };
+    return { waterCount, fertilizeCount, leafDistribution, leafTotal, growthData, recentRecords, waterByDay, fertilizeByDay, dateList };
   }, [records, plants]);
 
   const hasAnyData = stats.recentRecords.length > 0;
   const hasGrowthData = stats.growthData.some((g) => g.growth !== null);
+  const dateRangeLabel = `${formatShortDate(stats.dateList[0])} - ${formatShortDate(stats.dateList[stats.dateList.length - 1])}`;
 
   return (
     <div className="min-h-screen bg-cream-200">
@@ -125,7 +124,7 @@ export function CareStats() {
               <BarChart3 className="w-10 h-10 text-sage-400" />
             </div>
             <h2 className="text-xl font-serif text-sage-700 mb-2">暂无护理数据</h2>
-            <p className="text-sage-500 mb-2">最近 30 天内还没有任何护理记录</p>
+            <p className="text-sage-500 mb-2">{dateRangeLabel} 内还没有任何护理记录</p>
             <p className="text-sage-400 text-sm">开始记录浇水、施肥等护理操作后，这里将展示统计概览</p>
           </div>
         ) : (
@@ -139,7 +138,7 @@ export function CareStats() {
                   <span className="text-sm text-sage-500">浇水次数</span>
                 </div>
                 <div className="text-3xl font-serif text-sage-800">{stats.waterCount}</div>
-                <p className="text-xs text-sage-400 mt-1">近 30 天</p>
+                <p className="text-xs text-sage-400 mt-1">{dateRangeLabel}</p>
               </div>
               <div className="bg-white rounded-2xl p-5 shadow-sm border border-sage-100">
                 <div className="flex items-center gap-3 mb-3">
@@ -149,7 +148,7 @@ export function CareStats() {
                   <span className="text-sm text-sage-500">施肥次数</span>
                 </div>
                 <div className="text-3xl font-serif text-sage-800">{stats.fertilizeCount}</div>
-                <p className="text-xs text-sage-400 mt-1">近 30 天</p>
+                <p className="text-xs text-sage-400 mt-1">{dateRangeLabel}</p>
               </div>
             </div>
 
@@ -160,7 +159,7 @@ export function CareStats() {
               </div>
               {stats.leafTotal === 0 ? (
                 <div className="text-center py-8 text-sage-400 text-sm">
-                  最近 30 天没有叶片状态记录
+                  {dateRangeLabel} 没有叶片状态记录
                 </div>
               ) : (
                 <div className="space-y-4">
@@ -204,7 +203,7 @@ export function CareStats() {
               </div>
               {!hasGrowthData ? (
                 <div className="text-center py-8 text-sage-400 text-sm">
-                  最近 30 天没有高度记录
+                  {dateRangeLabel} 没有高度记录
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -253,7 +252,7 @@ export function CareStats() {
               <div className="flex items-center gap-2 mb-4">
                 <Droplets className="w-5 h-5 text-blue-400" />
                 <h2 className="text-lg font-serif text-sage-800">浇水趋势</h2>
-                <span className="text-xs text-sage-400 ml-1">近30天</span>
+                <span className="text-xs text-sage-400 ml-1">{dateRangeLabel}</span>
               </div>
               {stats.waterCount === 0 ? (
                 <div className="text-center py-6 text-sage-400 text-sm">暂无浇水记录</div>
@@ -287,7 +286,7 @@ export function CareStats() {
               <div className="flex items-center gap-2 mb-4">
                 <Leaf className="w-5 h-5 text-amber-400" />
                 <h2 className="text-lg font-serif text-sage-800">施肥趋势</h2>
-                <span className="text-xs text-sage-400 ml-1">近30天</span>
+                <span className="text-xs text-sage-400 ml-1">{dateRangeLabel}</span>
               </div>
               {stats.fertilizeCount === 0 ? (
                 <div className="text-center py-6 text-sage-400 text-sm">暂无施肥记录</div>

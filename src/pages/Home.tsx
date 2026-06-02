@@ -11,7 +11,7 @@ import { ImportExportModal } from '../components/ImportExportModal';
 type ViewMode = 'grid' | 'location';
 
 export function Home() {
-  const { plants, records, loadAllData } = usePlantStore();
+  const { plants, records, loadAllData, getNextCareInfo } = usePlantStore();
   const navigate = useNavigate();
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isImportExportOpen, setIsImportExportOpen] = useState(false);
@@ -147,6 +147,7 @@ export function Home() {
                     <PlantCard
                       plant={plant}
                       latestRecord={getLatestRecord(plant.id)}
+                      nextCareInfos={getNextCareInfo(plant.id)}
                     />
                   </div>
                 ))}

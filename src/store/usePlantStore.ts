@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Plant, PlantRecord, GrowthPhoto } from '../types';
+import type { Plant, PlantRecord, GrowthPhoto, CareSkip, NextCareInfo } from '../types';
 import {
   loadData,
   addPlant as storageAddPlant,
@@ -14,6 +14,10 @@ import {
   getGrowthPhotosByPlantId as storageGetGrowthPhotos,
   deleteGrowthPhoto as storageDeleteGrowthPhoto,
   deleteGrowthPhotosByPlantId as storageDeleteGrowthPhotosByPlantId,
+  addCareSkip as storageAddCareSkip,
+  getAllCareSkips,
+  deleteCareSkipsByPlantId as storageDeleteCareSkipsByPlantId,
+  calculateNextCare,
 } from '../utils/storage';
 
 export interface CareTask {
@@ -23,28 +27,34 @@ export interface CareTask {
   status: 'pending' | 'completed';
   lastCareDate: string | null;
   daysSinceLastCare: number;
+  nextCareInfo: NextCareInfo;
 }
 
 interface PlantStore {
   plants: Plant[];
   records: PlantRecord[];
   growthPhotos: GrowthPhoto[];
+  careSkips: CareSkip[];
   isLoaded: boolean;
-  
+
   loadAllData: () => void;
   addPlant: (plant: Omit<Plant, 'id' | 'createdAt'>) => void;
   updatePlant: (id: string, updates: Partial<Plant>) => void;
   deletePlant: (id: string) => void;
-  
+
   addRecord: (record: Omit<PlantRecord, 'id'>) => void;
   updateRecord: (id: string, updates: Partial<PlantRecord>) => void;
   deleteRecord: (id: string) => void;
-  
+
   getPlantRecords: (plantId: string) => PlantRecord[];
   getPlantById: (id: string) => Plant | undefined;
-  
+
   getTodayCareTasks: () => CareTask[];
   completeCareTask: (plantId: string, taskType: 'water' | 'fertilize') => void;
+  skipCareTask: (plantId: string, taskType: 'water' | 'fertilize') => void;
+
+  getNextCareInfo: (plantId: string) => NextCareInfo[];
+  getNextCareForPlant: (plantId: string, type: 'water' | 'fertilize') => NextCareInfo;
 
   loadGrowthPhotos: (plantId: string) => Promise<void>;
   addGrowthPhoto: (photo: Omit<GrowthPhoto, 'id' | 'createdAt'>) => Promise<GrowthPhoto>;
@@ -55,6 +65,7 @@ export const usePlantStore = create<PlantStore>((set, get) => ({
   plants: [],
   records: [],
   growthPhotos: [],
+  careSkips: [],
   isLoaded: false,
 
   loadAllData: () => {
@@ -62,6 +73,7 @@ export const usePlantStore = create<PlantStore>((set, get) => ({
     set({
       plants: data.plants,
       records: data.records,
+      careSkips: data.careSkips || [],
       isLoaded: true,
     });
   },
@@ -85,10 +97,12 @@ export const usePlantStore = create<PlantStore>((set, get) => ({
   deletePlant: (id) => {
     storageDeletePlant(id);
     storageDeleteGrowthPhotosByPlantId(id);
+    storageDeleteCareSkipsByPlantId(id);
     set((state) => ({
       plants: state.plants.filter((p) => p.id !== id),
       records: state.records.filter((r) => r.plantId !== id),
       growthPhotos: state.growthPhotos.filter((p) => p.plantId !== id),
+      careSkips: state.careSkips.filter((s) => s.plantId !== id),
     }));
   },
 
@@ -124,7 +138,7 @@ export const usePlantStore = create<PlantStore>((set, get) => ({
   },
 
   getTodayCareTasks: () => {
-    const { plants, records } = get();
+    const { plants, records, careSkips } = get();
     const today = getTodayString();
     const tasks: CareTask[] = [];
 
@@ -133,46 +147,26 @@ export const usePlantStore = create<PlantStore>((set, get) => ({
         .filter((r) => r.plantId === plant.id)
         .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
-      const lastWaterRecord = plantRecords.find((r) => r.watered);
-      const lastFertilizeRecord = plantRecords.find((r) => r.fertilized);
-
       const todayRecord = plantRecords.find((r) => r.date === today);
 
-      const getDaysDiff = (dateStr: string | null): number => {
-        if (!dateStr) return Infinity;
-        const lastDate = new Date(dateStr);
-        const todayDate = new Date(today);
-        return Math.floor((todayDate.getTime() - lastDate.getTime()) / (1000 * 60 * 60 * 24));
-      };
+      for (const type of ['water', 'fertilize'] as const) {
+        const nextInfo = calculateNextCare(plant, records, careSkips, type);
+        const isCompleted = type === 'water' ? !!todayRecord?.watered : !!todayRecord?.fertilized;
+        const isPending = nextInfo.isOverdue || nextInfo.daysUntil <= 0;
 
-      const daysSinceLastWater = getDaysDiff(lastWaterRecord?.date || null);
-      const needsWater = daysSinceLastWater >= (plant.wateringInterval || 7);
-      const waterCompleted = todayRecord?.watered || false;
-
-      if (needsWater || waterCompleted) {
-        tasks.push({
-          plantId: plant.id,
-          plantName: plant.name,
-          type: 'water',
-          status: waterCompleted ? 'completed' : 'pending',
-          lastCareDate: lastWaterRecord?.date || null,
-          daysSinceLastCare: daysSinceLastWater === Infinity ? -1 : daysSinceLastWater,
-        });
-      }
-
-      const daysSinceLastFertilize = getDaysDiff(lastFertilizeRecord?.date || null);
-      const needsFertilize = daysSinceLastFertilize >= (plant.fertilizingInterval || 30);
-      const fertilizeCompleted = todayRecord?.fertilized || false;
-
-      if (needsFertilize || fertilizeCompleted) {
-        tasks.push({
-          plantId: plant.id,
-          plantName: plant.name,
-          type: 'fertilize',
-          status: fertilizeCompleted ? 'completed' : 'pending',
-          lastCareDate: lastFertilizeRecord?.date || null,
-          daysSinceLastCare: daysSinceLastFertilize === Infinity ? -1 : daysSinceLastFertilize,
-        });
+        if (isPending || isCompleted) {
+          tasks.push({
+            plantId: plant.id,
+            plantName: plant.name,
+            type,
+            status: isCompleted ? 'completed' : 'pending',
+            lastCareDate: nextInfo.lastCareDate,
+            daysSinceLastCare: nextInfo.lastCareDate
+              ? Math.floor((new Date(today).getTime() - new Date(nextInfo.lastCareDate).getTime()) / (1000 * 60 * 60 * 24))
+              : -1,
+            nextCareInfo: nextInfo,
+          });
+        }
       }
     });
 
@@ -203,6 +197,50 @@ export const usePlantStore = create<PlantStore>((set, get) => ({
         notes: '',
       });
     }
+  },
+
+  skipCareTask: (plantId: string, taskType: 'water' | 'fertilize') => {
+    const { careSkips } = get();
+    const nextInfo = get().getNextCareForPlant(plantId, taskType);
+    const scheduledDate = nextInfo.isOverdue ? getTodayString() : nextInfo.nextDate;
+
+    const newSkip = storageAddCareSkip({
+      plantId,
+      type: taskType,
+      scheduledDate,
+      skippedAt: getTodayString(),
+    });
+
+    set((state) => ({
+      careSkips: [...state.careSkips, newSkip],
+    }));
+  },
+
+  getNextCareInfo: (plantId: string) => {
+    const { plants, records, careSkips } = get();
+    const plant = plants.find((p) => p.id === plantId);
+    if (!plant) return [];
+    return [
+      calculateNextCare(plant, records, careSkips, 'water'),
+      calculateNextCare(plant, records, careSkips, 'fertilize'),
+    ];
+  },
+
+  getNextCareForPlant: (plantId: string, type: 'water' | 'fertilize') => {
+    const { plants, records, careSkips } = get();
+    const plant = plants.find((p) => p.id === plantId);
+    if (!plant) {
+      return {
+        type,
+        nextDate: '',
+        daysUntil: 0,
+        isOverdue: false,
+        lastCareDate: null,
+        currentInterval: type === 'water' ? 7 : 30,
+        currentSeason: 'spring' as const,
+      };
+    }
+    return calculateNextCare(plant, records, careSkips, type);
   },
 
   loadGrowthPhotos: async (plantId: string) => {

@@ -1,9 +1,10 @@
-import { Droplets, Leaf, Check, Calendar, Sparkles } from 'lucide-react';
+import { Droplets, Leaf, Check, Calendar, Sparkles, SkipForward } from 'lucide-react';
 import { usePlantStore, type CareTask } from '../store/usePlantStore';
 import { getTodayString } from '../utils/storage';
+import { SEASON_LABELS } from '../types';
 
 export function DailyCare() {
-  const { getTodayCareTasks, completeCareTask } = usePlantStore();
+  const { getTodayCareTasks, completeCareTask, skipCareTask } = usePlantStore();
   const tasks = getTodayCareTasks();
 
   const pendingTasks = tasks.filter((t) => t.status === 'pending');
@@ -19,6 +20,10 @@ export function DailyCare() {
 
   const handleComplete = (task: CareTask) => {
     completeCareTask(task.plantId, task.type);
+  };
+
+  const handleSkip = (task: CareTask) => {
+    skipCareTask(task.plantId, task.type);
   };
 
   const TaskCard = ({ task }: { task: CareTask }) => (
@@ -47,16 +52,31 @@ export function DailyCare() {
             )}
             {!task.lastCareDate && <span className="ml-2">首次养护</span>}
           </p>
+          {task.nextCareInfo.currentInterval > 0 && (
+            <p className="text-xs text-sage-400 mt-0.5">
+              {SEASON_LABELS[task.nextCareInfo.currentSeason]}周期：每{task.nextCareInfo.currentInterval}天
+            </p>
+          )}
         </div>
       </div>
       {task.status === 'pending' ? (
-        <button
-          onClick={() => handleComplete(task)}
-          className="flex items-center gap-1.5 px-4 py-2 bg-sage-500 text-white text-sm rounded-lg hover:bg-sage-600 transition-colors"
-        >
-          <Check className="w-4 h-4" />
-          完成
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => handleSkip(task)}
+            className="flex items-center gap-1 px-3 py-2 border border-sage-200 text-sage-500 text-sm rounded-lg hover:bg-sage-50 transition-colors"
+            title="跳过本次，不破坏原有计划时间线"
+          >
+            <SkipForward className="w-3.5 h-3.5" />
+            跳过
+          </button>
+          <button
+            onClick={() => handleComplete(task)}
+            className="flex items-center gap-1.5 px-4 py-2 bg-sage-500 text-white text-sm rounded-lg hover:bg-sage-600 transition-colors"
+          >
+            <Check className="w-4 h-4" />
+            完成
+          </button>
+        </div>
       ) : (
         <span className="flex items-center gap-1.5 px-4 py-2 bg-emerald-50 text-emerald-600 text-sm rounded-lg">
           <Check className="w-4 h-4" />

@@ -1,4 +1,4 @@
-import type { Plant, PlantRecord, AppData, GrowthPhoto } from '../types';
+import type { Plant, PlantRecord, AppData, GrowthPhoto, CareSkip, Season, NextCareInfo } from '../types';
 
 const STORAGE_KEY = 'plant_tracker_data';
 const IDB_NAME = 'plant_tracker_photos';
@@ -17,12 +17,14 @@ export const loadData = (): AppData => {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
-      return JSON.parse(stored);
+      const data = JSON.parse(stored);
+      if (!data.careSkips) data.careSkips = [];
+      return data;
     }
   } catch (e) {
     console.error('Failed to load data from localStorage:', e);
   }
-  return { plants: [], records: [] };
+  return { plants: [], records: [], careSkips: [] };
 };
 
 export const saveData = (data: AppData): void => {
@@ -60,6 +62,7 @@ export const deletePlant = (id: string): void => {
   const data = loadData();
   data.plants = data.plants.filter((p) => p.id !== id);
   data.records = data.records.filter((r) => r.plantId !== id);
+  data.careSkips = (data.careSkips || []).filter((s) => s.plantId !== id);
   saveData(data);
 };
 
@@ -304,6 +307,102 @@ export const deleteGrowthPhotosByPlantId = async (plantId: string): Promise<void
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
   });
+};
+
+export const getCurrentSeason = (): Season => {
+  const month = new Date().getMonth();
+  if (month >= 2 && month <= 4) return 'spring';
+  if (month >= 5 && month <= 7) return 'summer';
+  if (month >= 8 && month <= 10) return 'autumn';
+  return 'winter';
+};
+
+export const getCareInterval = (plant: Plant, type: 'water' | 'fertilize', season?: Season): number => {
+  const currentSeason = season || getCurrentSeason();
+  if (plant.carePlan) {
+    const schedule = type === 'water' ? plant.carePlan.wateringSchedule : plant.carePlan.fertilizingSchedule;
+    const interval = schedule[currentSeason];
+    if (interval > 0) return interval;
+  }
+  return type === 'water' ? (plant.wateringInterval || 7) : (plant.fertilizingInterval || 30);
+};
+
+export const addCareSkip = (skip: Omit<CareSkip, 'id'>): CareSkip => {
+  const data = loadData();
+  const newSkip: CareSkip = { ...skip, id: generateId() };
+  if (!data.careSkips) data.careSkips = [];
+  data.careSkips.push(newSkip);
+  saveData(data);
+  return newSkip;
+};
+
+export const getCareSkipsByPlantId = (plantId: string): CareSkip[] => {
+  const data = loadData();
+  return (data.careSkips || []).filter((s) => s.plantId === plantId);
+};
+
+export const getAllCareSkips = (): CareSkip[] => {
+  const data = loadData();
+  return data.careSkips || [];
+};
+
+export const deleteCareSkipsByPlantId = (plantId: string): void => {
+  const data = loadData();
+  data.careSkips = (data.careSkips || []).filter((s) => s.plantId !== plantId);
+  saveData(data);
+};
+
+export const calculateNextCare = (
+  plant: Plant,
+  records: PlantRecord[],
+  skips: CareSkip[],
+  type: 'water' | 'fertilize'
+): NextCareInfo => {
+  const today = getTodayString();
+  const season = getCurrentSeason();
+  const interval = getCareInterval(plant, type, season);
+
+  const plantRecords = records
+    .filter((r) => r.plantId === plant.id)
+    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+  const lastCareRecord = [...plantRecords]
+    .reverse()
+    .find((r) => type === 'water' ? r.watered : r.fertilized);
+  const lastCareDate = lastCareRecord?.date || null;
+
+  const plantSkips = skips
+    .filter((s) => s.plantId === plant.id && s.type === type)
+    .sort((a, b) => new Date(b.scheduledDate).getTime() - new Date(a.scheduledDate).getTime());
+
+  let baseDate: string;
+  if (lastCareDate && plantSkips.length > 0) {
+    const lastCareTime = new Date(lastCareDate).getTime();
+    const lastSkipScheduledTime = new Date(plantSkips[0].scheduledDate).getTime();
+    baseDate = lastSkipScheduledTime > lastCareTime ? plantSkips[0].scheduledDate : lastCareDate;
+  } else if (plantSkips.length > 0) {
+    baseDate = plantSkips[0].scheduledDate;
+  } else {
+    baseDate = lastCareDate || plant.createdAt;
+  }
+
+  const baseTime = new Date(baseDate).getTime();
+  const nextTime = baseTime + interval * 24 * 60 * 60 * 1000;
+  const nextDate = new Date(nextTime).toISOString().split('T')[0];
+
+  const todayTime = new Date(today).getTime();
+  const daysUntil = Math.ceil((nextTime - todayTime) / (24 * 60 * 60 * 1000));
+  const isOverdue = daysUntil < 0;
+
+  return {
+    type,
+    nextDate,
+    daysUntil,
+    isOverdue,
+    lastCareDate,
+    currentInterval: interval,
+    currentSeason: season,
+  };
 };
 
 export const compressImage = (file: File, maxWidth = 800, quality = 0.7): Promise<string> => {

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Plus, Sprout, MapPin, Pencil, Trash2, Droplets, Leaf } from 'lucide-react';
+import { ArrowLeft, Plus, Sprout, MapPin, Pencil, Trash2, Droplets, Leaf, CalendarClock } from 'lucide-react';
 import { usePlantStore } from '../store/usePlantStore';
 import { Timeline } from '../components/Timeline';
 import { HeightChart } from '../components/HeightChart';
@@ -9,15 +9,20 @@ import { RecordForm } from '../components/RecordForm';
 import { PlantForm } from '../components/PlantForm';
 import { DayDetails } from '../components/DayDetails';
 import { GrowthAlbum } from '../components/GrowthAlbum';
+import { CarePlanForm } from '../components/CarePlanForm';
+import { NextCareList } from '../components/NextCareInfo';
 import type { PlantRecord } from '../types';
+import { SEASON_LABELS } from '../types';
+import { getCurrentSeason, getCareInterval } from '../utils/storage';
 
 export function PlantDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { getPlantById, records, deletePlant, loadAllData, loadGrowthPhotos } = usePlantStore();
-  
+  const { getPlantById, records, deletePlant, loadAllData, loadGrowthPhotos, getNextCareInfo } = usePlantStore();
+
   const [isRecordFormOpen, setIsRecordFormOpen] = useState(false);
   const [isPlantFormOpen, setIsPlantFormOpen] = useState(false);
+  const [isCarePlanFormOpen, setIsCarePlanFormOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [editRecord, setEditRecord] = useState<PlantRecord | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -70,6 +75,11 @@ export function PlantDetail() {
     ? plantRecords.filter((r) => r.date === selectedDate)
     : [];
 
+  const nextCareInfos = id ? getNextCareInfo(id) : [];
+  const currentSeason = getCurrentSeason();
+  const waterInterval = getCareInterval(plant, 'water');
+  const fertilizeInterval = getCareInterval(plant, 'fertilize');
+
   return (
     <div className="min-h-screen bg-cream-200">
       <header className="bg-white/60 backdrop-blur-sm border-b border-sage-100 sticky top-0 z-40">
@@ -83,6 +93,13 @@ export function PlantDetail() {
               <span className="hidden sm:inline">返回</span>
             </button>
             <div className="flex items-center gap-2">
+              <button
+                onClick={() => setIsCarePlanFormOpen(true)}
+                className="p-2 hover:bg-sage-100 rounded-lg transition-colors"
+                title="养护计划"
+              >
+                <CalendarClock className="w-5 h-5 text-sage-600" />
+              </button>
               <button
                 onClick={() => setIsPlantFormOpen(true)}
                 className="p-2 hover:bg-sage-100 rounded-lg transition-colors"
@@ -125,16 +142,86 @@ export function PlantDetail() {
               <div className="flex flex-wrap gap-3 mt-3">
                 <span className="inline-flex items-center gap-1.5 text-sm text-blue-600 bg-blue-50 px-3 py-1.5 rounded-full">
                   <Droplets className="w-4 h-4" />
-                  每 {plant.wateringInterval || 7} 天浇水
+                  {plant.carePlan ? (
+                    <>每 {waterInterval} 天浇水（{SEASON_LABELS[currentSeason]}）</>
+                  ) : (
+                    <>每 {plant.wateringInterval || 7} 天浇水</>
+                  )}
                 </span>
                 <span className="inline-flex items-center gap-1.5 text-sm text-amber-600 bg-amber-50 px-3 py-1.5 rounded-full">
                   <Leaf className="w-4 h-4" />
-                  每 {plant.fertilizingInterval || 30} 天施肥
+                  {plant.carePlan ? (
+                    <>每 {fertilizeInterval} 天施肥（{SEASON_LABELS[currentSeason]}）</>
+                  ) : (
+                    <>每 {plant.fertilizingInterval || 30} 天施肥</>
+                  )}
                 </span>
               </div>
             </div>
           </div>
         </div>
+
+        {nextCareInfos.length > 0 && (
+          <div className="bg-white rounded-2xl p-6 mb-6 shadow-sm border border-sage-100 animate-fade-in animate-stagger-1">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-serif text-sage-800">预计下次护理</h2>
+              <button
+                onClick={() => setIsCarePlanFormOpen(true)}
+                className="text-sm text-sage-500 hover:text-sage-700 transition-colors"
+              >
+                编辑计划
+              </button>
+            </div>
+            <NextCareList careInfos={nextCareInfos} />
+          </div>
+        )}
+
+        {plant.carePlan && (
+          <div className="bg-white rounded-2xl p-6 mb-6 shadow-sm border border-sage-100 animate-fade-in animate-stagger-2">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-serif text-sage-800">季节养护计划</h2>
+              <button
+                onClick={() => setIsCarePlanFormOpen(true)}
+                className="text-sm text-sage-500 hover:text-sage-700 transition-colors"
+              >
+                编辑
+              </button>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              {(['spring', 'summer', 'autumn', 'winter'] as const).map((season) => (
+                <div
+                  key={season}
+                  className={`p-3 rounded-xl border ${
+                    season === currentSeason
+                      ? 'border-sage-300 bg-sage-50'
+                      : 'border-sage-100'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium text-sage-700">
+                      {SEASON_LABELS[season]}
+                    </span>
+                    {season === currentSeason && (
+                      <span className="text-xs px-2 py-0.5 bg-sage-200 text-sage-700 rounded-full">
+                        当前
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-3 text-xs">
+                    <span className="flex items-center gap-1 text-blue-600">
+                      <Droplets className="w-3 h-3" />
+                      {plant.carePlan.wateringSchedule[season]}天
+                    </span>
+                    <span className="flex items-center gap-1 text-amber-600">
+                      <Leaf className="w-3 h-3" />
+                      {plant.carePlan.fertilizingSchedule[season]}天
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className="grid lg:grid-cols-2 gap-6 mb-6">
           <div className="bg-white rounded-2xl p-6 shadow-sm border border-sage-100 animate-fade-in animate-stagger-1">
@@ -178,6 +265,12 @@ export function PlantDetail() {
         isOpen={isPlantFormOpen}
         onClose={() => setIsPlantFormOpen(false)}
         editPlant={plant}
+      />
+
+      <CarePlanForm
+        isOpen={isCarePlanFormOpen}
+        onClose={() => setIsCarePlanFormOpen(false)}
+        plant={plant}
       />
 
       <DayDetails
