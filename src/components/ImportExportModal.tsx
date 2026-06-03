@@ -160,7 +160,7 @@ export function ImportExportModal({ isOpen, onClose, onImportComplete }: ImportE
                 <div>
                   <h3 className="font-medium text-sage-800 mb-1">文件验证成功</h3>
                   <p className="text-sm text-sage-500">
-                    包含 {importData?.plants.length || 0} 个植物，{importData?.records.length || 0} 条记录
+                    包含 {importData?.plants.length || 0} 个植物，{importData?.records.length || 0} 条记录，{(importData?.careSkips || []).length} 条跳过记录
                   </p>
                 </div>
               </div>
@@ -193,10 +193,22 @@ export function ImportExportModal({ isOpen, onClose, onImportComplete }: ImportE
                     </div>
                     <div className="text-xs text-orange-600">已存在记录</div>
                   </div>
+                  <div className="bg-purple-50 p-3 rounded-lg">
+                    <div className="text-2xl font-bold text-purple-600">
+                      {preview.newCareSkips.length}
+                    </div>
+                    <div className="text-xs text-purple-600">新增跳过</div>
+                  </div>
+                  <div className="bg-pink-50 p-3 rounded-lg">
+                    <div className="text-2xl font-bold text-pink-600">
+                      {preview.existingCareSkips.length}
+                    </div>
+                    <div className="text-xs text-pink-600">已存在跳过</div>
+                  </div>
                 </div>
               </div>
 
-              {preview.existingPlants.length + preview.existingRecords.length > 0 && (
+              {preview.existingPlants.length + preview.existingRecords.length + preview.existingCareSkips.length > 0 && (
                 <label className="flex items-start gap-3 p-3 bg-white rounded-lg border border-sage-200 cursor-pointer hover:bg-sage-50 transition-colors">
                   <input
                     type="checkbox"

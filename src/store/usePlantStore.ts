@@ -15,7 +15,6 @@ import {
   deleteGrowthPhoto as storageDeleteGrowthPhoto,
   deleteGrowthPhotosByPlantId as storageDeleteGrowthPhotosByPlantId,
   addCareSkip as storageAddCareSkip,
-  getAllCareSkips,
   deleteCareSkipsByPlantId as storageDeleteCareSkipsByPlantId,
   calculateNextCare,
 } from '../utils/storage';
@@ -200,7 +199,6 @@ export const usePlantStore = create<PlantStore>((set, get) => ({
   },
 
   skipCareTask: (plantId: string, taskType: 'water' | 'fertilize') => {
-    const { careSkips } = get();
     const nextInfo = get().getNextCareForPlant(plantId, taskType);
     const scheduledDate = nextInfo.isOverdue ? getTodayString() : nextInfo.nextDate;
 
@@ -261,6 +259,7 @@ export const usePlantStore = create<PlantStore>((set, get) => ({
     return newPhoto;
   },
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   deleteGrowthPhoto: async (id: string, plantId: string) => {
     await storageDeleteGrowthPhoto(id);
     set((state) => ({

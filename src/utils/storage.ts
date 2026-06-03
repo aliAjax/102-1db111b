@@ -129,6 +129,8 @@ export interface ImportPreview {
   existingPlants: Plant[];
   newRecords: PlantRecord[];
   existingRecords: PlantRecord[];
+  newCareSkips: CareSkip[];
+  existingCareSkips: CareSkip[];
 }
 
 export const exportData = (): string => {
@@ -185,6 +187,7 @@ export const validateImportData = (jsonStr: string): ImportValidationResult => {
       }
     }
     return { valid: true, data: data as AppData };
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   } catch (e) {
     return { valid: false, error: '文件解析失败：不是有效的 JSON 格式' };
   }
@@ -194,13 +197,17 @@ export const getImportPreview = (importData: AppData): ImportPreview => {
   const currentData = loadData();
   const currentPlantIds = new Set(currentData.plants.map(p => p.id));
   const currentRecordIds = new Set(currentData.records.map(r => r.id));
+  const currentSkipIds = new Set((currentData.careSkips || []).map(s => s.id));
 
   const newPlants = importData.plants.filter(p => !currentPlantIds.has(p.id));
   const existingPlants = importData.plants.filter(p => currentPlantIds.has(p.id));
   const newRecords = importData.records.filter(r => !currentRecordIds.has(r.id));
   const existingRecords = importData.records.filter(r => currentRecordIds.has(r.id));
+  const importSkips = importData.careSkips || [];
+  const newCareSkips = importSkips.filter(s => !currentSkipIds.has(s.id));
+  const existingCareSkips = importSkips.filter(s => currentSkipIds.has(s.id));
 
-  return { newPlants, existingPlants, newRecords, existingRecords };
+  return { newPlants, existingPlants, newRecords, existingRecords, newCareSkips, existingCareSkips };
 };
 
 export const mergeImportData = (importData: AppData, overwriteExisting: boolean): void => {
@@ -209,6 +216,7 @@ export const mergeImportData = (importData: AppData, overwriteExisting: boolean)
   if (overwriteExisting) {
     const importPlantIds = new Set(importData.plants.map(p => p.id));
     const importRecordIds = new Set(importData.records.map(r => r.id));
+    const importSkipIds = new Set((importData.careSkips || []).map(s => s.id));
     
     const mergedPlants = [
       ...currentData.plants.filter(p => !importPlantIds.has(p.id)),
@@ -219,18 +227,26 @@ export const mergeImportData = (importData: AppData, overwriteExisting: boolean)
       ...currentData.records.filter(r => !importRecordIds.has(r.id)),
       ...importData.records,
     ];
+
+    const mergedCareSkips = [
+      ...(currentData.careSkips || []).filter(s => !importSkipIds.has(s.id)),
+      ...(importData.careSkips || []),
+    ];
     
-    saveData({ plants: mergedPlants, records: mergedRecords });
+    saveData({ plants: mergedPlants, records: mergedRecords, careSkips: mergedCareSkips });
   } else {
     const currentPlantIds = new Set(currentData.plants.map(p => p.id));
     const currentRecordIds = new Set(currentData.records.map(r => r.id));
+    const currentSkipIds = new Set((currentData.careSkips || []).map(s => s.id));
     
     const newPlants = importData.plants.filter(p => !currentPlantIds.has(p.id));
     const newRecords = importData.records.filter(r => !currentRecordIds.has(r.id));
+    const newCareSkips = (importData.careSkips || []).filter(s => !currentSkipIds.has(s.id));
     
     saveData({
       plants: [...currentData.plants, ...newPlants],
       records: [...currentData.records, ...newRecords],
+      careSkips: [...(currentData.careSkips || []), ...newCareSkips],
     });
   }
 };
