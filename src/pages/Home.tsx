@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Database, LayoutGrid, MapPin, BarChart3, GitCompare, Camera } from 'lucide-react';
+import { Plus, Database, LayoutGrid, MapPin, BarChart3, GitCompare, Camera, ListPlus } from 'lucide-react';
 import { usePlantStore } from '../store/usePlantStore';
 import { PlantCard } from '../components/PlantCard';
 import { LocationView } from '../components/LocationView';
@@ -8,6 +8,7 @@ import { PlantForm } from '../components/PlantForm';
 import { DailyCare } from '../components/DailyCare';
 import { ImportExportModal } from '../components/ImportExportModal';
 import { SnapshotModal } from '../components/SnapshotModal';
+import { BatchRecordForm } from '../components/BatchRecordForm';
 
 type ViewMode = 'grid' | 'location';
 
@@ -17,6 +18,7 @@ export function Home() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isImportExportOpen, setIsImportExportOpen] = useState(false);
   const [isSnapshotOpen, setIsSnapshotOpen] = useState(false);
+  const [isBatchRecordOpen, setIsBatchRecordOpen] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [, forceUpdate] = useState({});
 
@@ -75,6 +77,13 @@ export function Home() {
                 title="数据快照"
               >
                 <Camera className="w-5 h-5" />
+              </button>
+              <button
+                onClick={() => setIsBatchRecordOpen(true)}
+                className="p-2.5 bg-sage-100 border border-sage-300 text-sage-700 rounded-xl hover:bg-sage-200 transition-colors"
+                title="批量录入护理记录"
+              >
+                <ListPlus className="w-5 h-5" />
               </button>
               <button
                 onClick={() => setIsFormOpen(true)}
@@ -187,6 +196,11 @@ export function Home() {
         isOpen={isSnapshotOpen}
         onClose={() => setIsSnapshotOpen(false)}
         onRestoreComplete={loadAllData}
+      />
+
+      <BatchRecordForm
+        isOpen={isBatchRecordOpen}
+        onClose={() => setIsBatchRecordOpen(false)}
       />
     </div>
   );
