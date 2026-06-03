@@ -253,29 +253,43 @@ const rules: WarningRule[] = [
 ];
 
 export const evaluatePlantWarnings = (plant: Plant, records: PlantRecord[]): Warning[] => {
-  const plantRecords = records.filter((r) => r.plantId === plant.id);
-  const warnings: Warning[] = [];
+  try {
+    const plantRecords = records.filter((r) => r.plantId === plant.id);
+    const warnings: Warning[] = [];
 
-  for (const rule of rules) {
-    const warning = rule.evaluate(plant, plantRecords);
-    if (warning) {
-      warnings.push(warning);
+    for (const rule of rules) {
+      try {
+        const warning = rule.evaluate(plant, plantRecords);
+        if (warning) {
+          warnings.push(warning);
+        }
+      } catch (ruleError) {
+        console.error(`Warning rule "${rule.type}" failed for plant ${plant.id}:`, ruleError);
+      }
     }
-  }
 
-  return warnings.sort((a, b) => {
-    const severityOrder = { high: 0, medium: 1, low: 2 };
-    return severityOrder[a.severity] - severityOrder[b.severity];
-  });
+    return warnings.sort((a, b) => {
+      const severityOrder = { high: 0, medium: 1, low: 2 };
+      return severityOrder[a.severity] - severityOrder[b.severity];
+    });
+  } catch (error) {
+    console.error(`Failed to evaluate warnings for plant ${plant.id}:`, error);
+    return [];
+  }
 };
 
 export const getHighestSeverity = (warnings: Warning[]): WarningSeverity | null => {
-  if (warnings.length === 0) return null;
-  const severityOrder: WarningSeverity[] = ['high', 'medium', 'low'];
-  for (const severity of severityOrder) {
-    if (warnings.some((w) => w.severity === severity)) {
-      return severity;
+  try {
+    if (!warnings || warnings.length === 0) return null;
+    const severityOrder: WarningSeverity[] = ['high', 'medium', 'low'];
+    for (const severity of severityOrder) {
+      if (warnings.some((w) => w && w.severity === severity)) {
+        return severity;
+      }
     }
+    return null;
+  } catch (error) {
+    console.error('Failed to get highest severity:', error);
+    return null;
   }
-  return null;
 };

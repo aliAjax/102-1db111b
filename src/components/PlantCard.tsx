@@ -1,6 +1,6 @@
 import { Sprout, MapPin, Calendar, Droplets, Leaf, AlertTriangle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import type { Plant, PlantRecord, NextCareInfo, Warning } from '../types';
 import { WarningDetailModal } from './WarningDetailModal';
 import { usePlantStore } from '../store/usePlantStore';
@@ -14,10 +14,19 @@ interface PlantCardProps {
 
 export function PlantCard({ plant, latestRecord, nextCareInfos, warnings: propWarnings }: PlantCardProps) {
   const navigate = useNavigate();
-  const { records } = usePlantStore();
+  const { records, getPlantWarnings } = usePlantStore();
   const [isWarningModalOpen, setIsWarningModalOpen] = useState(false);
-  const storeWarnings = usePlantStore((state) => state.getPlantWarnings(plant.id));
-  const warnings = propWarnings || storeWarnings;
+
+  const storeWarnings = useMemo(() => {
+    try {
+      return getPlantWarnings(plant.id) || [];
+    } catch (e) {
+      console.error('Failed to get warnings for plant', plant.id, e);
+      return [];
+    }
+  }, [plant.id, getPlantWarnings]);
+
+  const warnings = propWarnings ?? storeWarnings;
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);

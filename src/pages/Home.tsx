@@ -1,6 +1,6 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Database, LayoutGrid, MapPin, BarChart3, GitCompare, Camera, ListPlus, X, Filter, AlertTriangle, CheckCircle } from 'lucide-react';
+import { Plus, Database, LayoutGrid, MapPin, BarChart3, GitCompare, Camera, ListPlus, X, Filter } from 'lucide-react';
 import { usePlantStore } from '../store/usePlantStore';
 import { PlantCard } from '../components/PlantCard';
 import { LocationView } from '../components/LocationView';
@@ -17,8 +17,17 @@ type ViewMode = 'grid' | 'location';
 
 type WarningFilter = 'all' | 'has_warning' | 'no_warning' | WarningSeverity;
 
+const WARNING_FILTER_OPTIONS: { value: WarningFilter; label: string }[] = [
+  { value: 'all', label: '全部状态' },
+  { value: 'has_warning', label: '有预警' },
+  { value: 'no_warning', label: '无预警' },
+  { value: 'high', label: `严重 (${WARNING_SEVERITY_LABELS.high})` },
+  { value: 'medium', label: `中等 (${WARNING_SEVERITY_LABELS.medium})` },
+  { value: 'low', label: `轻微 (${WARNING_SEVERITY_LABELS.low})` },
+];
+
 export function Home() {
-  const { plants, records, loadAllData, getNextCareInfo, getAllPlantWarnings } = usePlantStore();
+  const { plants, records, loadAllData, getNextCareInfo, getPlantWarnings } = usePlantStore();
   const navigate = useNavigate();
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isImportExportOpen, setIsImportExportOpen] = useState(false);
@@ -55,9 +64,29 @@ export function Home() {
     return Array.from(uniqueLocations).sort((a, b) => a.localeCompare(b, 'zh-CN'));
   }, [plants]);
 
+  const getPlantWarningsSafe = useCallback((plantId: string) => {
+    try {
+      return getPlantWarnings(plantId) || [];
+    } catch (e) {
+      console.error('Failed to get warnings for plant', plantId, e);
+      return [];
+    }
+  }, [getPlantWarnings]);
+
   const allWarningsMap = useMemo(() => {
-    return getAllPlantWarnings();
-  }, [plants, records, getAllPlantWarnings]);
+    const map = new Map<string, { warnings: ReturnType<typeof getPlantWarningsSafe>; highestSeverity: WarningSeverity | null }>();
+    plants.forEach((plant) => {
+      try {
+        const warnings = getPlantWarningsSafe(plant.id);
+        const highestSeverity = getHighestSeverity(warnings);
+        map.set(plant.id, { warnings, highestSeverity });
+      } catch (e) {
+        console.error('Failed to process warnings for plant', plant.id, e);
+        map.set(plant.id, { warnings: [], highestSeverity: null });
+      }
+    });
+    return map;
+  }, [plants, getPlantWarningsSafe]);
 
   const filteredPlants = useMemo(() => {
     return plants.filter((plant) => {
@@ -68,8 +97,10 @@ export function Home() {
         }
       }
 
-      const warnings = allWarningsMap.get(plant.id) || [];
-      const highestSeverity = getHighestSeverity(warnings);
+      const warningInfo = allWarningsMap.get(plant.id);
+      if (!warningInfo) return false;
+
+      const { warnings, highestSeverity } = warningInfo;
       const hasWarning = warnings.length > 0;
 
       if (warningFilter === 'has_warning' && !hasWarning) {
@@ -94,19 +125,10 @@ export function Home() {
 
   const hasActiveFilters = locationFilter !== 'all' || warningFilter !== 'all';
 
-  const clearFilters = () => {
+  const clearFilters = useCallback(() => {
     setLocationFilter('all');
     setWarningFilter('all');
-  };
-
-  const warningFilterOptions: { value: WarningFilter; label: string; icon?: React.ReactNode }[] = [
-    { value: 'all', label: '全部状态' },
-    { value: 'has_warning', label: '有预警', icon: <AlertTriangle className="w-3.5 h-3.5" /> },
-    { value: 'no_warning', label: '无预警', icon: <CheckCircle className="w-3.5 h-3.5" /> },
-    { value: 'high', label: WARNING_SEVERITY_LABELS.high, icon: <div className="w-2 h-2 rounded-full bg-red-500" /> },
-    { value: 'medium', label: WARNING_SEVERITY_LABELS.medium, icon: <div className="w-2 h-2 rounded-full bg-amber-500" /> },
-    { value: 'low', label: WARNING_SEVERITY_LABELS.low, icon: <div className="w-2 h-2 rounded-full bg-blue-500" /> },
-  ];
+  }, []);
 
   return (
     <div className="min-h-screen bg-cream-200">
@@ -267,7 +289,7 @@ export function Home() {
                   onChange={(e) => setWarningFilter(e.target.value as WarningFilter)}
                   className="px-3 py-2 bg-white border border-sage-200 rounded-lg text-sm text-sage-700 focus:outline-none focus:ring-2 focus:ring-sage-300 focus:border-transparent cursor-pointer"
                 >
-                  {warningFilterOptions.map((option) => (
+                  {WARNING_FILTER_OPTIONS.map((option) => (
                     <option key={option.value} value={option.value}>
                       {option.label}
                     </option>
