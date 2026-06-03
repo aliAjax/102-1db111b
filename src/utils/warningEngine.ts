@@ -216,11 +216,13 @@ const rules: WarningRule[] = [
 
       if (daysSpan <= 14 && recentRecords.length >= 7) {
         const heightRecords = recentRecords.filter((r) => r.height > 0);
-        let growthDelta = 0;
-        if (heightRecords.length >= 2) {
-          const heights = heightRecords.map((r) => r.height);
-          growthDelta = Math.max(...heights) - Math.min(...heights);
+
+        if (heightRecords.length < 2) {
+          return null;
         }
+
+        const heights = heightRecords.map((r) => r.height);
+        const growthDelta = Math.max(...heights) - Math.min(...heights);
 
         if (growthDelta <= 1) {
           const waterCount = recentRecords.filter((r) => r.watered).length;

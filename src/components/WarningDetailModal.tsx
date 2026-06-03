@@ -1,6 +1,6 @@
 import { X, AlertTriangle, Droplets, Leaf, TrendingDown, Heart, Info, Clock, FileText } from 'lucide-react';
 import type { Warning, PlantRecord } from '../types';
-import { WARNING_TYPE_LABELS, WARNING_SEVERITY_LABELS, LEAF_STATUS_LABELS } from '../types';
+import { WARNING_SEVERITY_LABELS, LEAF_STATUS_LABELS } from '../types';
 
 interface WarningDetailModalProps {
   isOpen: boolean;

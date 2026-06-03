@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, GitCompare, Calendar, Droplets, AlertTriangle, TrendingUp, Sprout, CheckCircle2, XCircle, Info } from 'lucide-react';
 import { usePlantStore } from '../store/usePlantStore';
-import type { Plant, PlantRecord } from '../types';
+import type { Plant } from '../types';
 
 interface PlantCompareData {
   plantId: string;
@@ -164,7 +164,6 @@ export function PlantCompare() {
 
   const compareData = useMemo((): PlantCompareData[] => {
     const today = formatDate(new Date().toISOString());
-    const dateRangeOptions = getDateRangeOptions();
 
     return selectedPlantIds.map((plantId): PlantCompareData => {
       const plant = plants.find(p => p.id === plantId)!;
@@ -317,7 +316,6 @@ export function PlantCompare() {
   };
 
   const maxWaterCount = Math.max(...compareData.map(d => d.waterCount), 1);
-  const maxLeafAbnormal = Math.max(...compareData.map(d => d.leafAbnormalCount), 1);
   const maxGrowth = Math.max(...compareData.map(d => Math.abs(d.heightGrowth || 0)), 1);
 
   return (
