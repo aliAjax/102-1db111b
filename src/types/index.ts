@@ -10,6 +10,26 @@ export interface Plant {
   carePlan?: CarePlan;
 }
 
+export interface Snapshot {
+  id: string;
+  name: string;
+  description: string;
+  createdAt: string;
+  data: AppData;
+  version: number;
+}
+
+export interface SnapshotDiff {
+  plantsAdded: Plant[];
+  plantsRemoved: Plant[];
+  plantsModified: Plant[];
+  recordsAdded: PlantRecord[];
+  recordsRemoved: PlantRecord[];
+  recordsModified: PlantRecord[];
+  plantCountChange: number;
+  recordCountChange: number;
+}
+
 export type Season = 'spring' | 'summer' | 'autumn' | 'winter';
 
 export interface SeasonalInterval {

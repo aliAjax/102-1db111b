@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Database, LayoutGrid, MapPin, BarChart3, GitCompare } from 'lucide-react';
+import { Plus, Database, LayoutGrid, MapPin, BarChart3, GitCompare, Camera } from 'lucide-react';
 import { usePlantStore } from '../store/usePlantStore';
 import { PlantCard } from '../components/PlantCard';
 import { LocationView } from '../components/LocationView';
 import { PlantForm } from '../components/PlantForm';
 import { DailyCare } from '../components/DailyCare';
 import { ImportExportModal } from '../components/ImportExportModal';
+import { SnapshotModal } from '../components/SnapshotModal';
 
 type ViewMode = 'grid' | 'location';
 
@@ -15,6 +16,7 @@ export function Home() {
   const navigate = useNavigate();
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isImportExportOpen, setIsImportExportOpen] = useState(false);
+  const [isSnapshotOpen, setIsSnapshotOpen] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [, forceUpdate] = useState({});
 
@@ -66,6 +68,13 @@ export function Home() {
                 title="数据管理"
               >
                 <Database className="w-5 h-5" />
+              </button>
+              <button
+                onClick={() => setIsSnapshotOpen(true)}
+                className="p-2.5 bg-white border border-sage-200 text-sage-600 rounded-xl hover:bg-sage-50 transition-colors"
+                title="数据快照"
+              >
+                <Camera className="w-5 h-5" />
               </button>
               <button
                 onClick={() => setIsFormOpen(true)}
@@ -172,6 +181,12 @@ export function Home() {
         isOpen={isImportExportOpen}
         onClose={() => setIsImportExportOpen(false)}
         onImportComplete={loadAllData}
+      />
+
+      <SnapshotModal
+        isOpen={isSnapshotOpen}
+        onClose={() => setIsSnapshotOpen(false)}
+        onRestoreComplete={loadAllData}
       />
     </div>
   );
