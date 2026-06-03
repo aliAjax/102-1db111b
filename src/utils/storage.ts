@@ -469,10 +469,13 @@ export const loadSnapshots = (): Snapshot[] => {
       const snapshots = JSON.parse(stored);
       if (Array.isArray(snapshots)) {
         return snapshots
-          .map((snapshot: any) => ({
-            ...snapshot,
-            data: normalizeAppData(snapshot.data || {}),
-          }))
+          .map((snapshot: unknown) => {
+            const partialSnapshot = snapshot as Partial<Snapshot>;
+            return {
+              ...partialSnapshot,
+              data: normalizeAppData((partialSnapshot.data as Partial<AppData>) || {}),
+            } as Snapshot;
+          })
           .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
       }
     }
