@@ -104,3 +104,41 @@ export const LEAF_STATUS_LABELS: { [key in LeafStatus]: string } = {
   new_growth: '新芽',
   '': '未记录',
 };
+
+export type WarningType = 'yellowing_leaves' | 'no_watering' | 'stagnant_growth' | 'wilting_leaves' | 'over_caring';
+
+export type WarningSeverity = 'low' | 'medium' | 'high';
+
+export interface Warning {
+  id: string;
+  type: WarningType;
+  severity: WarningSeverity;
+  title: string;
+  description: string;
+  triggeredAt: string;
+  relatedRecords: string[];
+  details: WarningDetail;
+}
+
+export interface WarningDetail {
+  condition: string;
+  suggestion: string;
+  recordCount?: number;
+  daysWithoutCare?: number;
+  daysWithoutGrowth?: number;
+  careFrequency?: number;
+}
+
+export const WARNING_TYPE_LABELS: Record<WarningType, string> = {
+  yellowing_leaves: '叶片发黄',
+  no_watering: '缺水',
+  stagnant_growth: '生长停滞',
+  wilting_leaves: '叶片萎蔫',
+  over_caring: '过度护理',
+};
+
+export const WARNING_SEVERITY_LABELS: Record<WarningSeverity, string> = {
+  low: '轻微',
+  medium: '中等',
+  high: '严重',
+};

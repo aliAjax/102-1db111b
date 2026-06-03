@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Plus, Sprout, MapPin, Pencil, Trash2, Droplets, Leaf, CalendarClock } from 'lucide-react';
+import { ArrowLeft, Plus, Sprout, MapPin, Pencil, Trash2, Droplets, Leaf, CalendarClock, AlertTriangle } from 'lucide-react';
 import { usePlantStore } from '../store/usePlantStore';
 import { Timeline } from '../components/Timeline';
 import { HeightChart } from '../components/HeightChart';
@@ -11,18 +11,21 @@ import { DayDetails } from '../components/DayDetails';
 import { GrowthAlbum } from '../components/GrowthAlbum';
 import { CarePlanForm } from '../components/CarePlanForm';
 import { NextCareList } from '../components/NextCareInfo';
+import { WarningDetailModal } from '../components/WarningDetailModal';
 import type { PlantRecord } from '../types';
+import { WARNING_SEVERITY_LABELS } from '../types';
 import { SEASON_LABELS } from '../types';
 import { getCurrentSeason, getCareInterval } from '../utils/storage';
 
 export function PlantDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { getPlantById, records, deletePlant, loadAllData, loadGrowthPhotos, getNextCareInfo } = usePlantStore();
+  const { getPlantById, records, deletePlant, loadAllData, loadGrowthPhotos, getNextCareInfo, getPlantWarnings } = usePlantStore();
 
   const [isRecordFormOpen, setIsRecordFormOpen] = useState(false);
   const [isPlantFormOpen, setIsPlantFormOpen] = useState(false);
   const [isCarePlanFormOpen, setIsCarePlanFormOpen] = useState(false);
+  const [isWarningModalOpen, setIsWarningModalOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [editRecord, setEditRecord] = useState<PlantRecord | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -76,6 +79,8 @@ export function PlantDetail() {
     : [];
 
   const nextCareInfos = id ? getNextCareInfo(id) : [];
+  const warnings = id ? getPlantWarnings(id) : [];
+  const hasWarnings = warnings.length > 0;
   const currentSeason = getCurrentSeason();
   const waterInterval = getCareInterval(plant, 'water');
   const fertilizeInterval = getCareInterval(plant, 'fertilize');
@@ -160,6 +165,78 @@ export function PlantDetail() {
             </div>
           </div>
         </div>
+
+        {hasWarnings && (
+          <div
+            onClick={() => setIsWarningModalOpen(true)}
+            className={`rounded-2xl p-4 mb-6 shadow-sm border cursor-pointer hover:shadow-md transition-all animate-fade-in animate-stagger-1 ${
+              warnings.some((w) => w.severity === 'high')
+                ? 'bg-red-50 border-red-200'
+                : warnings.some((w) => w.severity === 'medium')
+                ? 'bg-amber-50 border-amber-200'
+                : 'bg-blue-50 border-blue-200'
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                warnings.some((w) => w.severity === 'high')
+                  ? 'bg-red-100'
+                  : warnings.some((w) => w.severity === 'medium')
+                  ? 'bg-amber-100'
+                  : 'bg-blue-100'
+              }`}>
+                <AlertTriangle className={`w-5 h-5 ${
+                  warnings.some((w) => w.severity === 'high')
+                    ? 'text-red-600'
+                    : warnings.some((w) => w.severity === 'medium')
+                    ? 'text-amber-600'
+                    : 'text-blue-600'
+                }`} />
+              </div>
+              <div className="flex-1">
+                <h3 className={`font-medium ${
+                  warnings.some((w) => w.severity === 'high')
+                    ? 'text-red-800'
+                    : warnings.some((w) => w.severity === 'medium')
+                    ? 'text-amber-800'
+                    : 'text-blue-800'
+                }`}>
+                  发现 {warnings.length} 个健康预警
+                </h3>
+                <div className="flex flex-wrap gap-2 mt-1">
+                  {warnings.slice(0, 3).map((warning) => (
+                    <span
+                      key={warning.id}
+                      className={`text-xs px-2 py-0.5 rounded-full ${
+                        warning.severity === 'high'
+                          ? 'bg-red-100 text-red-700'
+                          : warning.severity === 'medium'
+                          ? 'bg-amber-100 text-amber-700'
+                          : 'bg-blue-100 text-blue-700'
+                      }`}
+                    >
+                      {WARNING_SEVERITY_LABELS[warning.severity]} · {warning.title}
+                    </span>
+                  ))}
+                  {warnings.length > 3 && (
+                    <span className="text-xs text-sage-500">
+                      +{warnings.length - 3} 项更多
+                    </span>
+                  )}
+                </div>
+              </div>
+              <div className={`text-sm ${
+                warnings.some((w) => w.severity === 'high')
+                  ? 'text-red-600'
+                  : warnings.some((w) => w.severity === 'medium')
+                  ? 'text-amber-600'
+                  : 'text-blue-600'
+              }`}>
+                查看详情 →
+              </div>
+            </div>
+          </div>
+        )}
 
         {nextCareInfos.length > 0 && (
           <div className="bg-white rounded-2xl p-6 mb-6 shadow-sm border border-sage-100 animate-fade-in animate-stagger-1">
@@ -278,6 +355,14 @@ export function PlantDetail() {
         onClose={() => setSelectedDate(null)}
         date={selectedDate || ''}
         records={selectedDateRecords}
+        plantName={plant.name}
+      />
+
+      <WarningDetailModal
+        isOpen={isWarningModalOpen}
+        onClose={() => setIsWarningModalOpen(false)}
+        warnings={warnings}
+        records={plantRecords}
         plantName={plant.name}
       />
 

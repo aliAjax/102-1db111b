@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Plant, PlantRecord, GrowthPhoto, CareSkip, NextCareInfo } from '../types';
+import type { Plant, PlantRecord, GrowthPhoto, CareSkip, NextCareInfo, Warning } from '../types';
 import {
   loadData,
   addPlant as storageAddPlant,
@@ -18,6 +18,7 @@ import {
   deleteCareSkipsByPlantId as storageDeleteCareSkipsByPlantId,
   calculateNextCare,
 } from '../utils/storage';
+import { evaluatePlantWarnings } from '../utils/warningEngine';
 
 export interface CareTask {
   plantId: string;
@@ -54,6 +55,9 @@ interface PlantStore {
 
   getNextCareInfo: (plantId: string) => NextCareInfo[];
   getNextCareForPlant: (plantId: string, type: 'water' | 'fertilize') => NextCareInfo;
+
+  getPlantWarnings: (plantId: string) => Warning[];
+  getAllPlantWarnings: () => Map<string, Warning[]>;
 
   loadGrowthPhotos: (plantId: string) => Promise<void>;
   addGrowthPhoto: (photo: Omit<GrowthPhoto, 'id' | 'createdAt'>) => Promise<GrowthPhoto>;
@@ -239,6 +243,25 @@ export const usePlantStore = create<PlantStore>((set, get) => ({
       };
     }
     return calculateNextCare(plant, records, careSkips, type);
+  },
+
+  getPlantWarnings: (plantId: string) => {
+    const { plants, records } = get();
+    const plant = plants.find((p) => p.id === plantId);
+    if (!plant) return [];
+    return evaluatePlantWarnings(plant, records);
+  },
+
+  getAllPlantWarnings: () => {
+    const { plants, records } = get();
+    const warningsMap = new Map<string, Warning[]>();
+    plants.forEach((plant) => {
+      const warnings = evaluatePlantWarnings(plant, records);
+      if (warnings.length > 0) {
+        warningsMap.set(plant.id, warnings);
+      }
+    });
+    return warningsMap;
   },
 
   loadGrowthPhotos: async (plantId: string) => {
