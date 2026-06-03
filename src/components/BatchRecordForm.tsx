@@ -48,16 +48,18 @@ export function BatchRecordForm({ isOpen, onClose }: BatchRecordFormProps) {
   }, [date]);
 
   const isRecordDuplicate = (plantId: string): { isDuplicate: boolean; record?: PlantRecord } => {
-    const existing = existingRecords.find((r) => r.plantId === plantId);
-    if (!existing) return { isDuplicate: false };
+    const plantExistingRecords = existingRecords.filter((r) => r.plantId === plantId);
+    if (plantExistingRecords.length === 0) return { isDuplicate: false };
     
-    const isSame = 
-      existing.watered === watered &&
-      existing.fertilized === fertilized &&
-      existing.leafStatus === leafStatus &&
-      existing.notes === notes;
+    const duplicateRecord = plantExistingRecords.find(
+      (existing) =>
+        existing.watered === watered &&
+        existing.fertilized === fertilized &&
+        existing.leafStatus === leafStatus &&
+        existing.notes === notes
+    );
     
-    return { isDuplicate: isSame, record: existing };
+    return { isDuplicate: !!duplicateRecord, record: duplicateRecord };
   };
 
   const togglePlantSelection = (plantId: string) => {
