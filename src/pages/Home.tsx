@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Database, LayoutGrid, MapPin, BarChart3, GitCompare, Camera, ListPlus } from 'lucide-react';
+import { Plus, Database, LayoutGrid, MapPin, BarChart3, GitCompare, Camera, ListPlus, X, Filter, AlertTriangle, CheckCircle } from 'lucide-react';
 import { usePlantStore } from '../store/usePlantStore';
 import { PlantCard } from '../components/PlantCard';
 import { LocationView } from '../components/LocationView';
@@ -9,11 +9,16 @@ import { DailyCare } from '../components/DailyCare';
 import { ImportExportModal } from '../components/ImportExportModal';
 import { SnapshotModal } from '../components/SnapshotModal';
 import { BatchRecordForm } from '../components/BatchRecordForm';
+import { getHighestSeverity } from '../utils/warningEngine';
+import type { WarningSeverity } from '../types';
+import { WARNING_SEVERITY_LABELS } from '../types';
 
 type ViewMode = 'grid' | 'location';
 
+type WarningFilter = 'all' | 'has_warning' | 'no_warning' | WarningSeverity;
+
 export function Home() {
-  const { plants, records, loadAllData, getNextCareInfo } = usePlantStore();
+  const { plants, records, loadAllData, getNextCareInfo, getAllPlantWarnings } = usePlantStore();
   const navigate = useNavigate();
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isImportExportOpen, setIsImportExportOpen] = useState(false);
@@ -21,6 +26,8 @@ export function Home() {
   const [isBatchRecordOpen, setIsBatchRecordOpen] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [, forceUpdate] = useState({});
+  const [locationFilter, setLocationFilter] = useState<string>('all');
+  const [warningFilter, setWarningFilter] = useState<WarningFilter>('all');
 
   useEffect(() => {
     loadAllData();
@@ -37,6 +44,69 @@ export function Home() {
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     return plantRecords[0];
   };
+
+  const locations = useMemo(() => {
+    const uniqueLocations = new Set<string>();
+    plants.forEach((plant) => {
+      if (plant.location?.trim()) {
+        uniqueLocations.add(plant.location.trim());
+      }
+    });
+    return Array.from(uniqueLocations).sort((a, b) => a.localeCompare(b, 'zh-CN'));
+  }, [plants]);
+
+  const allWarningsMap = useMemo(() => {
+    return getAllPlantWarnings();
+  }, [plants, records, getAllPlantWarnings]);
+
+  const filteredPlants = useMemo(() => {
+    return plants.filter((plant) => {
+      if (locationFilter !== 'all') {
+        const plantLocation = plant.location?.trim() || '';
+        if (plantLocation !== locationFilter) {
+          return false;
+        }
+      }
+
+      const warnings = allWarningsMap.get(plant.id) || [];
+      const highestSeverity = getHighestSeverity(warnings);
+      const hasWarning = warnings.length > 0;
+
+      if (warningFilter === 'has_warning' && !hasWarning) {
+        return false;
+      }
+      if (warningFilter === 'no_warning' && hasWarning) {
+        return false;
+      }
+      if (warningFilter === 'high' && highestSeverity !== 'high') {
+        return false;
+      }
+      if (warningFilter === 'medium' && highestSeverity !== 'medium') {
+        return false;
+      }
+      if (warningFilter === 'low' && highestSeverity !== 'low') {
+        return false;
+      }
+
+      return true;
+    });
+  }, [plants, locationFilter, warningFilter, allWarningsMap]);
+
+  const hasActiveFilters = locationFilter !== 'all' || warningFilter !== 'all';
+
+  const clearFilters = () => {
+    setLocationFilter('all');
+    setWarningFilter('all');
+  };
+
+  const warningFilterOptions: { value: WarningFilter; label: string; icon?: React.ReactNode }[] = [
+    { value: 'all', label: '全部状态' },
+    { value: 'has_warning', label: '有预警', icon: <AlertTriangle className="w-3.5 h-3.5" /> },
+    { value: 'no_warning', label: '无预警', icon: <CheckCircle className="w-3.5 h-3.5" /> },
+    { value: 'high', label: WARNING_SEVERITY_LABELS.high, icon: <div className="w-2 h-2 rounded-full bg-red-500" /> },
+    { value: 'medium', label: WARNING_SEVERITY_LABELS.medium, icon: <div className="w-2 h-2 rounded-full bg-amber-500" /> },
+    { value: 'low', label: WARNING_SEVERITY_LABELS.low, icon: <div className="w-2 h-2 rounded-full bg-blue-500" /> },
+  ];
 
   return (
     <div className="min-h-screen bg-cream-200">
@@ -137,37 +207,106 @@ export function Home() {
           </div>
         ) : (
           <div>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-serif text-sage-800">我的植物</h2>
-              <div className="flex items-center gap-1 bg-white rounded-xl p-1 border border-sage-100 shadow-sm">
-                <button
-                  onClick={() => setViewMode('grid')}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm transition-colors ${
-                    viewMode === 'grid'
-                      ? 'bg-sage-500 text-white'
-                      : 'text-sage-600 hover:bg-sage-50'
-                  }`}
+            <div className="flex flex-col gap-4 mb-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <h2 className="text-lg font-serif text-sage-800">我的植物</h2>
+                  {hasActiveFilters && (
+                    <span className="text-xs bg-sage-100 text-sage-600 px-2.5 py-1 rounded-full">
+                      筛选结果 {filteredPlants.length} / {plants.length}
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-1 bg-white rounded-xl p-1 border border-sage-100 shadow-sm">
+                  <button
+                    onClick={() => setViewMode('grid')}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm transition-colors ${
+                      viewMode === 'grid'
+                        ? 'bg-sage-500 text-white'
+                        : 'text-sage-600 hover:bg-sage-50'
+                    }`}
+                  >
+                    <LayoutGrid className="w-4 h-4" />
+                    <span className="hidden sm:inline">网格视图</span>
+                  </button>
+                  <button
+                    onClick={() => setViewMode('location')}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm transition-colors ${
+                      viewMode === 'location'
+                        ? 'bg-sage-500 text-white'
+                        : 'text-sage-600 hover:bg-sage-50'
+                    }`}
+                  >
+                    <MapPin className="w-4 h-4" />
+                    <span className="hidden sm:inline">位置视图</span>
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="flex items-center gap-2">
+                  <Filter className="w-4 h-4 text-sage-500" />
+                  <span className="text-sm text-sage-600">筛选：</span>
+                </div>
+
+                <select
+                  value={locationFilter}
+                  onChange={(e) => setLocationFilter(e.target.value)}
+                  className="px-3 py-2 bg-white border border-sage-200 rounded-lg text-sm text-sage-700 focus:outline-none focus:ring-2 focus:ring-sage-300 focus:border-transparent cursor-pointer"
                 >
-                  <LayoutGrid className="w-4 h-4" />
-                  <span className="hidden sm:inline">网格视图</span>
-                </button>
-                <button
-                  onClick={() => setViewMode('location')}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm transition-colors ${
-                    viewMode === 'location'
-                      ? 'bg-sage-500 text-white'
-                      : 'text-sage-600 hover:bg-sage-50'
-                  }`}
+                  <option value="all">全部位置</option>
+                  {locations.map((loc) => (
+                    <option key={loc} value={loc}>
+                      {loc}
+                    </option>
+                  ))}
+                </select>
+
+                <select
+                  value={warningFilter}
+                  onChange={(e) => setWarningFilter(e.target.value as WarningFilter)}
+                  className="px-3 py-2 bg-white border border-sage-200 rounded-lg text-sm text-sage-700 focus:outline-none focus:ring-2 focus:ring-sage-300 focus:border-transparent cursor-pointer"
                 >
-                  <MapPin className="w-4 h-4" />
-                  <span className="hidden sm:inline">位置视图</span>
-                </button>
+                  {warningFilterOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+
+                {hasActiveFilters && (
+                  <button
+                    onClick={clearFilters}
+                    className="flex items-center gap-1.5 px-3 py-2 text-sm text-sage-600 hover:text-sage-800 hover:bg-sage-50 rounded-lg transition-colors"
+                  >
+                    <X className="w-4 h-4" />
+                    清空筛选
+                  </button>
+                )}
               </div>
             </div>
 
-            {viewMode === 'grid' ? (
+            {filteredPlants.length === 0 ? (
+              <div className="text-center py-20 bg-white/60 rounded-2xl border border-sage-100">
+                <div className="w-20 h-20 bg-sage-100 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                  <Filter className="w-10 h-10 text-sage-400" />
+                </div>
+                <h2 className="text-xl font-serif text-sage-700 mb-2">
+                  没有符合筛选条件的植物
+                </h2>
+                <p className="text-sage-500 mb-6">
+                  试试调整筛选条件，或者
+                  <button
+                    onClick={clearFilters}
+                    className="text-sage-600 hover:text-sage-800 underline ml-1"
+                  >
+                    清空所有筛选
+                  </button>
+                </p>
+              </div>
+            ) : viewMode === 'grid' ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                {plants.map((plant, index) => (
+                {filteredPlants.map((plant, index) => (
                   <div key={plant.id} style={{ animationDelay: `${index * 0.05}s` }}>
                     <PlantCard
                       plant={plant}
@@ -178,7 +317,7 @@ export function Home() {
                 ))}
               </div>
             ) : (
-              <LocationView plants={plants} records={records} />
+              <LocationView plants={filteredPlants} records={records} />
             )}
           </div>
         )}
