@@ -24,7 +24,7 @@ export function PlantCard({ plant, latestRecord, nextCareInfos, warnings: propWa
       console.error('Failed to get warnings for plant', plant.id, e);
       return [];
     }
-  }, [plant.id, getPlantWarnings]);
+  }, [plant.id, records, getPlantWarnings]);
 
   const warnings = propWarnings ?? storeWarnings;
 

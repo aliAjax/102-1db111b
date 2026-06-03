@@ -86,7 +86,7 @@ export function Home() {
       }
     });
     return map;
-  }, [plants, getPlantWarningsSafe]);
+  }, [plants, records, getPlantWarningsSafe]);
 
   const filteredPlants = useMemo(() => {
     return plants.filter((plant) => {
