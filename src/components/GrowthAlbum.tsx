@@ -1,5 +1,5 @@
-import { useState, useRef } from 'react';
-import { Camera, Plus, Trash2, X, ImagePlus, Droplets, Sparkles, Leaf, Ruler } from 'lucide-react';
+import { useState, useRef, useMemo } from 'react';
+import { Camera, Plus, Trash2, X, ImagePlus, Droplets, Sparkles, Leaf, Ruler, Search } from 'lucide-react';
 import { usePlantStore } from '../store/usePlantStore';
 import { compressImage, getTodayString } from '../utils/storage';
 import { LEAF_STATUS_LABELS } from '../types';
@@ -10,6 +10,17 @@ interface GrowthAlbumProps {
   records: PlantRecord[];
 }
 
+const formatDate = (dateStr: string) => {
+  const date = new Date(dateStr);
+  const options: Intl.DateTimeFormatOptions = {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    weekday: 'short',
+  };
+  return date.toLocaleDateString('zh-CN', options);
+};
+
 export function GrowthAlbum({ plantId, records }: GrowthAlbumProps) {
   const { growthPhotos, addGrowthPhoto, deleteGrowthPhoto, loadGrowthPhotos } = usePlantStore();
   const [isAdding, setIsAdding] = useState(false);
@@ -18,6 +29,7 @@ export function GrowthAlbum({ plantId, records }: GrowthAlbumProps) {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const plantPhotos = growthPhotos
@@ -29,6 +41,36 @@ export function GrowthAlbum({ plantId, records }: GrowthAlbumProps) {
     acc[r.date].push(r);
     return acc;
   }, {} as { [key: string]: PlantRecord[] });
+
+  const filteredPhotos = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) return plantPhotos;
+    return plantPhotos.filter((photo) => {
+      if (photo.note.toLowerCase().includes(query)) return true;
+      const dateStr = formatDate(photo.date).toLowerCase();
+      if (dateStr.includes(query)) return true;
+      return false;
+    });
+  }, [plantPhotos, searchQuery]);
+
+  const groupedPhotos = useMemo(() => {
+    const groups: { monthKey: string; monthLabel: string; photos: GrowthPhoto[] }[] = [];
+    const monthMap = new Map<string, GrowthPhoto[]>();
+    filteredPhotos.forEach((photo) => {
+      const d = new Date(photo.date);
+      const monthKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      if (!monthMap.has(monthKey)) monthMap.set(monthKey, []);
+      monthMap.get(monthKey)!.push(photo);
+    });
+    const sortedKeys = [...monthMap.keys()].sort((a, b) => b.localeCompare(a));
+    sortedKeys.forEach((key) => {
+      const [year, month] = key.split('-');
+      const d = new Date(Number(year), Number(month) - 1);
+      const monthLabel = d.toLocaleDateString('zh-CN', { year: 'numeric', month: 'long' });
+      groups.push({ monthKey: key, monthLabel, photos: monthMap.get(key)! });
+    });
+    return groups;
+  }, [filteredPhotos]);
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -76,17 +118,6 @@ export function GrowthAlbum({ plantId, records }: GrowthAlbumProps) {
   const handleDelete = async (photo: GrowthPhoto) => {
     await deleteGrowthPhoto(photo.id, plantId);
     await loadGrowthPhotos(plantId);
-  };
-
-  const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
-    const options: Intl.DateTimeFormatOptions = {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      weekday: 'short',
-    };
-    return date.toLocaleDateString('zh-CN', options);
   };
 
   const renderCareSummary = (date: string) => {
@@ -240,46 +271,86 @@ export function GrowthAlbum({ plantId, records }: GrowthAlbumProps) {
           <p className="text-sm mt-1">记录植物的生长变化吧</p>
         </div>
       ) : (
-        <div className="space-y-6">
-          {plantPhotos.map((photo) => (
-            <div
-              key={photo.id}
-              className="group relative bg-white rounded-xl border border-sage-100 shadow-sm overflow-hidden"
-            >
-              <div className="flex flex-col sm:flex-row">
-                <div className="sm:w-56 flex-shrink-0">
-                  <img
-                    src={photo.photoDataUrl}
-                    alt={photo.note || '生长照片'}
-                    className="w-full h-48 sm:h-full object-cover"
-                  />
-                </div>
-                <div className="flex-1 p-4">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <h4 className="text-sm font-medium text-sage-700">
-                        {formatDate(photo.date)}
-                      </h4>
-                      {photo.note && (
-                        <p className="text-sm text-sage-600 mt-1.5">{photo.note}</p>
-                      )}
-                    </div>
-                    <button
-                      onClick={() => handleDelete(photo)}
-                      className="p-1.5 hover:bg-red-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
-                    >
-                      <Trash2 className="w-4 h-4 text-red-400" />
-                    </button>
-                  </div>
-                  <div className="mt-3 pt-3 border-t border-sage-50">
-                    <p className="text-xs text-sage-500 mb-2">护理记录</p>
-                    {renderCareSummary(photo.date)}
-                  </div>
-                </div>
-              </div>
+        <>
+          <div className="relative mb-4">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-sage-400" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="搜索照片备注或日期..."
+              className="w-full pl-9 pr-4 py-2.5 border border-sage-200 rounded-xl bg-white text-sage-800 placeholder:text-sage-300 focus:outline-none focus:ring-2 focus:ring-sage-300 focus:border-sage-400 transition-colors text-sm"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 p-0.5 hover:bg-sage-100 rounded transition-colors"
+              >
+                <X className="w-4 h-4 text-sage-400" />
+              </button>
+            )}
+          </div>
+
+          {filteredPhotos.length === 0 ? (
+            <div className="text-center py-12 text-sage-400">
+              <Search className="w-12 h-12 mx-auto mb-3 opacity-50" />
+              <p>没有找到匹配的照片</p>
+              <p className="text-sm mt-1">尝试其他关键词搜索</p>
             </div>
-          ))}
-        </div>
+          ) : (
+            <div className="space-y-8">
+              {groupedPhotos.map((group) => (
+                <div key={group.monthKey}>
+                  <div className="flex items-center gap-3 mb-4">
+                    <h3 className="text-sm font-medium text-sage-600 whitespace-nowrap">{group.monthLabel}</h3>
+                    <div className="flex-1 h-px bg-sage-100" />
+                    <span className="text-xs text-sage-400">{group.photos.length} 张</span>
+                  </div>
+                  <div className="space-y-4">
+                    {group.photos.map((photo) => (
+                      <div
+                        key={photo.id}
+                        className="group relative bg-white rounded-xl border border-sage-100 shadow-sm overflow-hidden"
+                      >
+                        <div className="flex flex-col sm:flex-row">
+                          <div className="sm:w-56 flex-shrink-0">
+                            <img
+                              src={photo.photoDataUrl}
+                              alt={photo.note || '生长照片'}
+                              className="w-full h-48 sm:h-full object-cover"
+                            />
+                          </div>
+                          <div className="flex-1 p-4">
+                            <div className="flex items-start justify-between">
+                              <div>
+                                <h4 className="text-sm font-medium text-sage-700">
+                                  {formatDate(photo.date)}
+                                </h4>
+                                {photo.note && (
+                                  <p className="text-sm text-sage-600 mt-1.5">{photo.note}</p>
+                                )}
+                              </div>
+                              <button
+                                onClick={() => handleDelete(photo)}
+                                className="p-1.5 hover:bg-red-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                              >
+                                <Trash2 className="w-4 h-4 text-red-400" />
+                              </button>
+                            </div>
+                            <div className="mt-3 pt-3 border-t border-sage-50">
+                              <p className="text-xs text-sage-500 mb-2">护理记录</p>
+                              {renderCareSummary(photo.date)}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
       )}
     </div>
   );
