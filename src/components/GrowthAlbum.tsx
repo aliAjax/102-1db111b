@@ -36,22 +36,32 @@ export function GrowthAlbum({ plantId, records }: GrowthAlbumProps) {
     .filter((p) => p.plantId === plantId)
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
-  const recordsByDate = records.reduce((acc, r) => {
-    if (!acc[r.date]) acc[r.date] = [];
-    acc[r.date].push(r);
-    return acc;
-  }, {} as { [key: string]: PlantRecord[] });
+  const recordsByDate = useMemo(() => {
+    return records.reduce((acc, r) => {
+      if (!acc[r.date]) acc[r.date] = [];
+      acc[r.date].push(r);
+      return acc;
+    }, {} as { [key: string]: PlantRecord[] });
+  }, [records]);
 
   const filteredPhotos = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
     if (!query) return plantPhotos;
     return plantPhotos.filter((photo) => {
       if (photo.note.toLowerCase().includes(query)) return true;
+      if (photo.date.toLowerCase().includes(query)) return true;
       const dateStr = formatDate(photo.date).toLowerCase();
       if (dateStr.includes(query)) return true;
+      const dateRecords = recordsByDate[photo.date];
+      if (dateRecords) {
+        for (const r of dateRecords) {
+          if (r.date.toLowerCase().includes(query)) return true;
+          if (r.notes.toLowerCase().includes(query)) return true;
+        }
+      }
       return false;
     });
-  }, [plantPhotos, searchQuery]);
+  }, [plantPhotos, searchQuery, recordsByDate]);
 
   const groupedPhotos = useMemo(() => {
     const groups: { monthKey: string; monthLabel: string; photos: GrowthPhoto[] }[] = [];
@@ -278,7 +288,7 @@ export function GrowthAlbum({ plantId, records }: GrowthAlbumProps) {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="搜索照片备注或日期..."
+              placeholder="搜索备注、日期（如 2024-03）或护理记录..."
               className="w-full pl-9 pr-4 py-2.5 border border-sage-200 rounded-xl bg-white text-sage-800 placeholder:text-sage-300 focus:outline-none focus:ring-2 focus:ring-sage-300 focus:border-sage-400 transition-colors text-sm"
             />
             {searchQuery && (
