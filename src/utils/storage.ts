@@ -391,15 +391,24 @@ export const calculateNextCare = (
 
   const plantSkips = skips
     .filter((s) => s.plantId === plant.id && s.type === type)
-    .sort((a, b) => new Date(b.scheduledDate).getTime() - new Date(a.scheduledDate).getTime());
+    .sort((a, b) => {
+      const aDate = a.deferredToDate || a.scheduledDate;
+      const bDate = b.deferredToDate || b.scheduledDate;
+      return new Date(bDate).getTime() - new Date(aDate).getTime();
+    });
 
   let baseDate: string;
-  if (lastCareDate && plantSkips.length > 0) {
-    const lastCareTime = new Date(lastCareDate).getTime();
-    const lastSkipScheduledTime = new Date(plantSkips[0].scheduledDate).getTime();
-    baseDate = lastSkipScheduledTime > lastCareTime ? plantSkips[0].scheduledDate : lastCareDate;
-  } else if (plantSkips.length > 0) {
-    baseDate = plantSkips[0].scheduledDate;
+  if (plantSkips.length > 0) {
+    const latestSkip = plantSkips[0];
+    const skipEffectiveDate = latestSkip.deferredToDate || latestSkip.scheduledDate;
+    const skipEffectiveTime = new Date(skipEffectiveDate).getTime();
+
+    if (lastCareDate) {
+      const lastCareTime = new Date(lastCareDate).getTime();
+      baseDate = skipEffectiveTime > lastCareTime ? skipEffectiveDate : lastCareDate;
+    } else {
+      baseDate = skipEffectiveDate;
+    }
   } else {
     baseDate = lastCareDate || plant.createdAt;
   }

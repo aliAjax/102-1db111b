@@ -52,6 +52,7 @@ interface PlantStore {
   getTodayCareTasks: () => CareTask[];
   completeCareTask: (plantId: string, taskType: 'water' | 'fertilize') => void;
   skipCareTask: (plantId: string, taskType: 'water' | 'fertilize') => void;
+  deferCareTask: (plantId: string, taskType: 'water' | 'fertilize', deferToDate: string) => void;
 
   getNextCareInfo: (plantId: string) => NextCareInfo[];
   getNextCareForPlant: (plantId: string, type: 'water' | 'fertilize') => NextCareInfo;
@@ -211,6 +212,23 @@ export const usePlantStore = create<PlantStore>((set, get) => ({
       type: taskType,
       scheduledDate,
       skippedAt: getTodayString(),
+    });
+
+    set((state) => ({
+      careSkips: [...state.careSkips, newSkip],
+    }));
+  },
+
+  deferCareTask: (plantId: string, taskType: 'water' | 'fertilize', deferToDate: string) => {
+    const nextInfo = get().getNextCareForPlant(plantId, taskType);
+    const scheduledDate = nextInfo.isOverdue ? getTodayString() : nextInfo.nextDate;
+
+    const newSkip = storageAddCareSkip({
+      plantId,
+      type: taskType,
+      scheduledDate,
+      skippedAt: getTodayString(),
+      deferredToDate: deferToDate,
     });
 
     set((state) => ({

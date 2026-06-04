@@ -50,6 +50,7 @@ export interface CareSkip {
   type: 'water' | 'fertilize';
   scheduledDate: string;
   skippedAt: string;
+  deferredToDate?: string;
 }
 
 export type LeafStatus = 'healthy' | 'yellowing' | 'wilting' | 'new_growth' | '';
