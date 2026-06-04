@@ -397,26 +397,35 @@ export const calculateNextCare = (
       return new Date(bDate).getTime() - new Date(aDate).getTime();
     });
 
+  let nextDate: string;
   let baseDate: string;
+
   if (plantSkips.length > 0) {
     const latestSkip = plantSkips[0];
-    const skipEffectiveDate = latestSkip.deferredToDate || latestSkip.scheduledDate;
-    const skipEffectiveTime = new Date(skipEffectiveDate).getTime();
+    const latestSkipTime = new Date(latestSkip.deferredToDate || latestSkip.scheduledDate).getTime();
+    const lastCareTime = lastCareDate ? new Date(lastCareDate).getTime() : 0;
 
-    if (lastCareDate) {
-      const lastCareTime = new Date(lastCareDate).getTime();
-      baseDate = skipEffectiveTime > lastCareTime ? skipEffectiveDate : lastCareDate;
+    if (lastCareTime > latestSkipTime) {
+      baseDate = lastCareDate!;
+      const baseTime = new Date(baseDate).getTime();
+      nextDate = new Date(baseTime + interval * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
     } else {
-      baseDate = skipEffectiveDate;
+      if (latestSkip.deferredToDate) {
+        nextDate = latestSkip.deferredToDate;
+        baseDate = latestSkip.deferredToDate;
+      } else {
+        baseDate = latestSkip.scheduledDate;
+        const baseTime = new Date(baseDate).getTime();
+        nextDate = new Date(baseTime + interval * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+      }
     }
   } else {
     baseDate = lastCareDate || plant.createdAt;
+    const baseTime = new Date(baseDate).getTime();
+    nextDate = new Date(baseTime + interval * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
   }
 
-  const baseTime = new Date(baseDate).getTime();
-  const nextTime = baseTime + interval * 24 * 60 * 60 * 1000;
-  const nextDate = new Date(nextTime).toISOString().split('T')[0];
-
+  const nextTime = new Date(nextDate).getTime();
   const todayTime = new Date(today).getTime();
   const daysUntil = Math.ceil((nextTime - todayTime) / (24 * 60 * 60 * 1000));
   const isOverdue = daysUntil < 0;

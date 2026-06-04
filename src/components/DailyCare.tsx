@@ -165,7 +165,7 @@ export function DailyCare() {
             </div>
             {deferDate && (
               <p className="text-xs text-sage-400 mt-2">
-                下次{task.type === 'water' ? '浇水' : '施肥'}将从 {formatDate(deferDate)} 开始，按 {task.nextCareInfo.currentInterval} 天周期继续滚动
+                下次{task.type === 'water' ? '浇水' : '施肥'}日期调整为 {formatDate(deferDate)}，完成后按 {task.nextCareInfo.currentInterval} 天周期继续滚动
               </p>
             )}
           </div>
