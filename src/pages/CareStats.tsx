@@ -1,9 +1,18 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Droplets, Leaf, Sprout, TrendingUp, BarChart3 } from 'lucide-react';
+import { ArrowLeft, Droplets, Leaf, Sprout, TrendingUp, BarChart3, Calendar } from 'lucide-react';
 import { usePlantStore } from '../store/usePlantStore';
 import { LEAF_STATUS_LABELS } from '../types';
 import type { LeafStatus, PlantRecord } from '../types';
+
+type TimeRange = '7d' | '30d' | '90d' | 'all';
+
+const TIME_RANGE_OPTIONS: { value: TimeRange; label: string; days: number | null }[] = [
+  { value: '7d', label: '最近7天', days: 7 },
+  { value: '30d', label: '最近30天', days: 30 },
+  { value: '90d', label: '最近90天', days: 90 },
+  { value: 'all', label: '全部时间', days: null },
+];
 
 interface PlantGrowth {
   plantId: string;
@@ -28,14 +37,18 @@ function formatShortDate(dateStr: string): string {
 export function CareStats() {
   const navigate = useNavigate();
   const { plants, records, loadAllData } = usePlantStore();
+  const [timeRange, setTimeRange] = useState<TimeRange>('30d');
 
   useEffect(() => {
     loadAllData();
   }, [loadAllData]);
 
   const stats = useMemo(() => {
+    const daysOption = TIME_RANGE_OPTIONS.find((o) => o.value === timeRange)?.days;
+    const daysToInclude = daysOption ?? 36500;
+
     const dateList: string[] = [];
-    for (let i = 29; i >= 0; i--) {
+    for (let i = daysToInclude - 1; i >= 0; i--) {
       const d = getDaysAgo(i);
       dateList.push(
         `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
@@ -43,7 +56,8 @@ export function CareStats() {
     }
     const dateSet = new Set(dateList);
 
-    const recentRecords = records.filter((r: PlantRecord) => dateSet.has(r.date));
+    const filteredRecords = timeRange === 'all' ? records : records.filter((r: PlantRecord) => dateSet.has(r.date));
+    const recentRecords = filteredRecords;
 
     const waterCount = recentRecords.filter((r: PlantRecord) => r.watered).length;
     const fertilizeCount = recentRecords.filter((r: PlantRecord) => r.fertilized).length;
@@ -84,20 +98,59 @@ export function CareStats() {
       growthData.push({ plantId, plantName: val.name, startHeight, endHeight, growth });
     });
 
-    const waterByDay: { date: string; count: number }[] = [];
-    const fertilizeByDay: { date: string; count: number }[] = [];
-    for (const dateStr of dateList) {
-      const dayRecords = recentRecords.filter((r: PlantRecord) => r.date === dateStr);
-      waterByDay.push({ date: dateStr, count: dayRecords.filter((r: PlantRecord) => r.watered).length });
-      fertilizeByDay.push({ date: dateStr, count: dayRecords.filter((r: PlantRecord) => r.fertilized).length });
+    let chartDateList = dateList;
+    if (timeRange === 'all') {
+      const allRecordDates = [...new Set(recentRecords.map((r: PlantRecord) => r.date))].sort();
+      if (allRecordDates.length > 0) {
+        const firstDate = new Date(allRecordDates[0]);
+        const lastDate = new Date(allRecordDates[allRecordDates.length - 1]);
+        chartDateList = [];
+        const d = new Date(firstDate);
+        while (d <= lastDate) {
+          chartDateList.push(
+            `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+          );
+          d.setDate(d.getDate() + 1);
+        }
+      }
     }
 
-    return { waterCount, fertilizeCount, leafDistribution, leafTotal, growthData, recentRecords, waterByDay, fertilizeByDay, dateList };
-  }, [records, plants]);
+    const maxChartBars = 60;
+    let sampledChartDates = chartDateList;
+    let sampleInterval = 1;
+    if (chartDateList.length > maxChartBars) {
+      sampleInterval = Math.ceil(chartDateList.length / maxChartBars);
+      sampledChartDates = chartDateList.filter((_, i) => i % sampleInterval === 0 || i === chartDateList.length - 1);
+    }
+
+    const waterByDay: { date: string; count: number }[] = [];
+    const fertilizeByDay: { date: string; count: number }[] = [];
+    for (const dateStr of sampledChartDates) {
+      const idx = chartDateList.indexOf(dateStr);
+      const endIdx = idx + sampleInterval;
+      const dateRange = chartDateList.slice(idx, Math.min(endIdx, chartDateList.length));
+      let waterCount = 0;
+      let fertilizeCount = 0;
+      for (const d of dateRange) {
+        const dayRecords = recentRecords.filter((r: PlantRecord) => r.date === d);
+        waterCount += dayRecords.filter((r: PlantRecord) => r.watered).length;
+        fertilizeCount += dayRecords.filter((r: PlantRecord) => r.fertilized).length;
+      }
+      waterByDay.push({ date: dateStr, count: waterCount });
+      fertilizeByDay.push({ date: dateStr, count: fertilizeCount });
+    }
+
+    const displayDateList = timeRange === 'all' && chartDateList.length > 0 ? chartDateList : dateList;
+
+    return { waterCount, fertilizeCount, leafDistribution, leafTotal, growthData, recentRecords, waterByDay, fertilizeByDay, dateList: displayDateList };
+  }, [records, plants, timeRange]);
 
   const hasAnyData = stats.recentRecords.length > 0;
   const hasGrowthData = stats.growthData.some((g) => g.growth !== null);
-  const dateRangeLabel = `${formatShortDate(stats.dateList[0])} - ${formatShortDate(stats.dateList[stats.dateList.length - 1])}`;
+  const dateRangeLabel =
+    stats.dateList.length > 0
+      ? `${formatShortDate(stats.dateList[0])} - ${formatShortDate(stats.dateList[stats.dateList.length - 1])}`
+      : '';
 
   return (
     <div className="min-h-screen bg-cream-200">
@@ -118,6 +171,28 @@ export function CareStats() {
       </header>
 
       <main className="container py-8">
+        <div className="mb-6 animate-fade-in">
+          <div className="flex items-center gap-2 mb-3">
+            <Calendar className="w-4 h-4 text-sage-500" />
+            <span className="text-sm text-sage-600">时间范围</span>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {TIME_RANGE_OPTIONS.map((option) => (
+              <button
+                key={option.value}
+                onClick={() => setTimeRange(option.value)}
+                className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
+                  timeRange === option.value
+                    ? 'bg-sage-600 text-white shadow-sm'
+                    : 'bg-white text-sage-600 border border-sage-200 hover:bg-sage-50'
+                }`}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
         {!hasAnyData ? (
           <div className="text-center py-20 animate-fade-in">
             <div className="w-20 h-20 bg-sage-100 rounded-2xl flex items-center justify-center mx-auto mb-6">
