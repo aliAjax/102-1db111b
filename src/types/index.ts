@@ -23,9 +23,11 @@ export interface SnapshotDiff {
   plantsAdded: Plant[];
   plantsRemoved: Plant[];
   plantsModified: Plant[];
+  plantsModifiedCurrent: Plant[];
   recordsAdded: PlantRecord[];
   recordsRemoved: PlantRecord[];
   recordsModified: PlantRecord[];
+  recordsModifiedCurrent: PlantRecord[];
   plantCountChange: number;
   recordCountChange: number;
 }

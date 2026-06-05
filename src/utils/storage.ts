@@ -551,23 +551,37 @@ export const calculateSnapshotDiff = (snapshot: Snapshot): SnapshotDiff => {
     if (!current) return false;
     return JSON.stringify(current) !== JSON.stringify(p);
   });
-  
+
+  const plantsModifiedCurrent = currentData.plants.filter(p => {
+    const snapshot = snapshotData.plants.find(sp => sp.id === p.id);
+    if (!snapshot) return false;
+    return JSON.stringify(snapshot) !== JSON.stringify(p);
+  });
+
   const recordsAdded = currentData.records.filter(r => !snapshotRecordIds.has(r.id));
   const recordsRemoved = snapshotData.records.filter(r => !currentRecordIds.has(r.id));
-  
+
   const recordsModified = snapshotData.records.filter(r => {
     const current = currentData.records.find(cr => cr.id === r.id);
     if (!current) return false;
     return JSON.stringify(current) !== JSON.stringify(r);
+  });
+
+  const recordsModifiedCurrent = currentData.records.filter(r => {
+    const snapshot = snapshotData.records.find(sr => sr.id === r.id);
+    if (!snapshot) return false;
+    return JSON.stringify(snapshot) !== JSON.stringify(r);
   });
   
   return {
     plantsAdded,
     plantsRemoved,
     plantsModified,
+    plantsModifiedCurrent,
     recordsAdded,
     recordsRemoved,
     recordsModified,
+    recordsModifiedCurrent,
     plantCountChange: snapshotData.plants.length - currentData.plants.length,
     recordCountChange: snapshotData.records.length - currentData.records.length,
   };
