@@ -1,8 +1,8 @@
-import { useState, useEffect, useMemo } from 'react';
-import { X, Check, Calendar, Leaf, Droplets, Sprout, AlertTriangle } from 'lucide-react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
+import { X, Check, Calendar, Leaf, Droplets, Sprout, AlertTriangle, Ruler, RotateCcw } from 'lucide-react';
 import type { LeafStatus, PlantRecord, Plant } from '../types';
 import { usePlantStore } from '../store/usePlantStore';
-import { getTodayString, getRecordsByDate } from '../utils/storage';
+import { getTodayString, getRecordsByDate, getRecordsByPlantId } from '../utils/storage';
 import { LEAF_STATUS_LABELS } from '../types';
 
 interface BatchRecordFormProps {
@@ -12,11 +12,31 @@ interface BatchRecordFormProps {
 
 type Step = 'select' | 'settings' | 'preview';
 
+interface PlantRecordEntry {
+  plantId: string;
+  watered: boolean;
+  fertilized: boolean;
+  leafStatus: LeafStatus;
+  height: number;
+  notes: string;
+  prefilledLeafStatus: LeafStatus;
+  prefilledHeight: number;
+}
+
 interface RecordPreview {
   plant: Plant;
+  entry: PlantRecordEntry;
   isDuplicate: boolean;
   existingRecord?: PlantRecord;
   willSkip: boolean;
+}
+
+function isEntryModified(entry: PlantRecordEntry): boolean {
+  if (entry.watered || entry.fertilized) return true;
+  if (entry.leafStatus !== entry.prefilledLeafStatus) return true;
+  if (entry.height !== entry.prefilledHeight) return true;
+  if (entry.notes.trim() !== '') return true;
+  return false;
 }
 
 export function BatchRecordForm({ isOpen, onClose }: BatchRecordFormProps) {
@@ -24,10 +44,7 @@ export function BatchRecordForm({ isOpen, onClose }: BatchRecordFormProps) {
   const [step, setStep] = useState<Step>('select');
   const [date, setDate] = useState(getTodayString());
   const [selectedPlantIds, setSelectedPlantIds] = useState<Set<string>>(new Set());
-  const [watered, setWatered] = useState(false);
-  const [fertilized, setFertilized] = useState(false);
-  const [leafStatus, setLeafStatus] = useState<LeafStatus>('');
-  const [notes, setNotes] = useState('');
+  const [entries, setEntries] = useState<Map<string, PlantRecordEntry>>(new Map());
   const [previews, setPreviews] = useState<RecordPreview[]>([]);
 
   useEffect(() => {
@@ -35,10 +52,7 @@ export function BatchRecordForm({ isOpen, onClose }: BatchRecordFormProps) {
       setStep('select');
       setDate(getTodayString());
       setSelectedPlantIds(new Set());
-      setWatered(false);
-      setFertilized(false);
-      setLeafStatus('');
-      setNotes('');
+      setEntries(new Map());
       setPreviews([]);
     }
   }, [isOpen]);
@@ -47,20 +61,30 @@ export function BatchRecordForm({ isOpen, onClose }: BatchRecordFormProps) {
     return getRecordsByDate(date);
   }, [date]);
 
-  const isRecordDuplicate = (plantId: string): { isDuplicate: boolean; record?: PlantRecord } => {
-    const plantExistingRecords = existingRecords.filter((r) => r.plantId === plantId);
-    if (plantExistingRecords.length === 0) return { isDuplicate: false };
-    
-    const duplicateRecord = plantExistingRecords.find(
-      (existing) =>
-        existing.watered === watered &&
-        existing.fertilized === fertilized &&
-        existing.leafStatus === leafStatus &&
-        existing.notes === notes
-    );
-    
-    return { isDuplicate: !!duplicateRecord, record: duplicateRecord };
-  };
+  const buildEntriesFromSelection = useCallback(() => {
+    const newEntries = new Map<string, PlantRecordEntry>();
+    selectedPlantIds.forEach((plantId) => {
+      const plantRecords = getRecordsByPlantId(plantId);
+      const lastRecord = plantRecords.length > 0 ? plantRecords[0] : null;
+
+      const existing = entries.get(plantId);
+      if (existing) {
+        newEntries.set(plantId, existing);
+      } else {
+        newEntries.set(plantId, {
+          plantId,
+          watered: false,
+          fertilized: false,
+          leafStatus: lastRecord?.leafStatus || '',
+          height: lastRecord?.height || 0,
+          notes: '',
+          prefilledLeafStatus: lastRecord?.leafStatus || '',
+          prefilledHeight: lastRecord?.height || 0,
+        });
+      }
+    });
+    return newEntries;
+  }, [selectedPlantIds, entries]);
 
   const togglePlantSelection = (plantId: string) => {
     const newSelection = new Set(selectedPlantIds);
@@ -82,22 +106,88 @@ export function BatchRecordForm({ isOpen, onClose }: BatchRecordFormProps) {
 
   const goToSettings = () => {
     if (selectedPlantIds.size === 0) return;
+    setEntries(buildEntriesFromSelection());
     setStep('settings');
+  };
+
+  const updateEntry = (plantId: string, updates: Partial<PlantRecordEntry>) => {
+    setEntries((prev) => {
+      const current = prev.get(plantId);
+      if (!current) return prev;
+      const next = new Map(prev);
+      next.set(plantId, { ...current, ...updates });
+      return next;
+    });
+  };
+
+  const resetEntryToPrefill = (plantId: string) => {
+    setEntries((prev) => {
+      const current = prev.get(plantId);
+      if (!current) return prev;
+      const next = new Map(prev);
+      next.set(plantId, {
+        ...current,
+        watered: false,
+        fertilized: false,
+        leafStatus: current.prefilledLeafStatus,
+        height: current.prefilledHeight,
+        notes: '',
+      });
+      return next;
+    });
+  };
+
+  const batchSetWatered = (value: boolean) => {
+    setEntries((prev) => {
+      const next = new Map(prev);
+      next.forEach((entry, key) => {
+        next.set(key, { ...entry, watered: value });
+      });
+      return next;
+    });
+  };
+
+  const batchSetFertilized = (value: boolean) => {
+    setEntries((prev) => {
+      const next = new Map(prev);
+      next.forEach((entry, key) => {
+        next.set(key, { ...entry, fertilized: value });
+      });
+      return next;
+    });
   };
 
   const goToPreview = () => {
     const previewList: RecordPreview[] = [];
-    selectedPlantIds.forEach((plantId) => {
+    entries.forEach((entry, plantId) => {
       const plant = plants.find((p) => p.id === plantId);
-      if (plant) {
-        const { isDuplicate, record } = isRecordDuplicate(plantId);
-        previewList.push({
-          plant,
-          isDuplicate,
-          existingRecord: record,
-          willSkip: isDuplicate,
-        });
+      if (!plant) return;
+
+      if (!isEntryModified(entry)) return;
+
+      const plantExistingRecords = existingRecords.filter((r) => r.plantId === plantId);
+      let isDuplicate = false;
+      let duplicateRecord: PlantRecord | undefined;
+
+      if (plantExistingRecords.length > 0) {
+        duplicateRecord = plantExistingRecords.find(
+          (existing) =>
+            existing.watered === entry.watered &&
+            existing.fertilized === entry.fertilized &&
+            existing.leafStatus === entry.leafStatus &&
+            existing.height === entry.height &&
+            existing.notes === entry.notes
+        );
+        isDuplicate = !!duplicateRecord;
       }
+
+      previewList.push({
+        plant,
+        entry,
+        isDuplicate,
+        existingRecord: duplicateRecord,
+        willSkip: isDuplicate,
+      });
     });
     setPreviews(previewList);
     setStep('preview');
@@ -117,11 +207,11 @@ export function BatchRecordForm({ isOpen, onClose }: BatchRecordFormProps) {
       addRecord({
         plantId: preview.plant.id,
         date,
-        watered,
-        fertilized,
-        leafStatus,
-        height: 0,
-        notes,
+        watered: preview.entry.watered,
+        fertilized: preview.entry.fertilized,
+        leafStatus: preview.entry.leafStatus,
+        height: preview.entry.height,
+        notes: preview.entry.notes,
       });
     });
     loadAllData();
@@ -129,6 +219,7 @@ export function BatchRecordForm({ isOpen, onClose }: BatchRecordFormProps) {
   };
 
   const hasDuplicates = previews.some((p) => p.isDuplicate);
+  const modifiedCount = Array.from(entries.values()).filter(isEntryModified).length;
 
   if (!isOpen) return null;
 
@@ -213,29 +304,41 @@ export function BatchRecordForm({ isOpen, onClose }: BatchRecordFormProps) {
                   </button>
                 </div>
                 <div className="space-y-2 max-h-64 overflow-y-auto pr-2">
-                  {plants.map((plant) => (
-                    <label
-                      key={plant.id}
-                      className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all ${
-                        selectedPlantIds.has(plant.id)
-                          ? 'bg-sage-100 border-2 border-sage-300'
-                          : 'bg-white border border-sage-200 hover:border-sage-300'
-                      }`}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={selectedPlantIds.has(plant.id)}
-                        onChange={() => togglePlantSelection(plant.id)}
-                        className="w-5 h-5 rounded border-sage-300 text-sage-600 focus:ring-sage-500"
-                      />
-                      <div className="flex-1">
-                        <div className="font-medium text-sage-800">{plant.name}</div>
-                        <div className="text-sm text-sage-500">
-                          {plant.species} · {plant.location}
+                  {plants.map((plant) => {
+                    const plantRecords = getRecordsByPlantId(plant.id);
+                    const lastRecord = plantRecords.length > 0 ? plantRecords[0] : null;
+                    return (
+                      <label
+                        key={plant.id}
+                        className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all ${
+                          selectedPlantIds.has(plant.id)
+                            ? 'bg-sage-100 border-2 border-sage-300'
+                            : 'bg-white border border-sage-200 hover:border-sage-300'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedPlantIds.has(plant.id)}
+                          onChange={() => togglePlantSelection(plant.id)}
+                          className="w-5 h-5 rounded border-sage-300 text-sage-600 focus:ring-sage-500"
+                        />
+                        <div className="flex-1">
+                          <div className="font-medium text-sage-800">{plant.name}</div>
+                          <div className="text-sm text-sage-500">
+                            {plant.species} · {plant.location}
+                          </div>
+                          {lastRecord && (
+                            <div className="text-xs text-sage-400 mt-1">
+                              上次记录：{lastRecord.leafStatus ? LEAF_STATUS_LABELS[lastRecord.leafStatus] : '无叶片状态'}
+                              {lastRecord.height > 0 ? ` · ${lastRecord.height}cm` : ''}
+                              <span className="text-sage-300 mx-1">·</span>
+                              {lastRecord.date}
+                            </div>
+                          )}
                         </div>
-                      </div>
-                    </label>
-                  ))}
+                      </label>
+                    );
+                  })}
                   {plants.length === 0 && (
                     <div className="text-center py-8 text-sage-500">
                       还没有添加植物
@@ -247,72 +350,165 @@ export function BatchRecordForm({ isOpen, onClose }: BatchRecordFormProps) {
           )}
 
           {step === 'settings' && (
-            <div className="space-y-5">
+            <div className="space-y-4">
               <div className="p-4 bg-sage-50 rounded-xl">
                 <div className="text-sm text-sage-600">
                   已选择 <span className="font-semibold text-sage-800">{selectedPlantIds.size}</span> 盆植物
-                </div>
-                <div className="text-sm text-sage-500">
+                  <span className="text-sage-400 mx-2">·</span>
                   日期：{date}
                 </div>
+                <div className="text-xs text-sage-400 mt-1">
+                  叶片状态和高度已按上次记录预填，勾选浇水/施肥并按需微调即可
+                </div>
               </div>
 
-              <div className="flex gap-4">
-                <label className="flex items-center gap-3 cursor-pointer flex-1 p-4 bg-white rounded-xl border border-sage-200 hover:border-sage-300 transition-colors">
-                  <input
-                    type="checkbox"
-                    checked={watered}
-                    onChange={(e) => setWatered(e.target.checked)}
-                    className="w-5 h-5 rounded border-sage-300 text-sage-600 focus:ring-sage-500"
-                  />
-                  <Droplets className="w-5 h-5 text-blue-500" />
-                  <span className="text-sage-700">已浇水</span>
-                </label>
-                <label className="flex items-center gap-3 cursor-pointer flex-1 p-4 bg-white rounded-xl border border-sage-200 hover:border-sage-300 transition-colors">
-                  <input
-                    type="checkbox"
-                    checked={fertilized}
-                    onChange={(e) => setFertilized(e.target.checked)}
-                    className="w-5 h-5 rounded border-sage-300 text-sage-600 focus:ring-sage-500"
-                  />
-                  <Sprout className="w-5 h-5 text-green-500" />
-                  <span className="text-sage-700">已施肥</span>
-                </label>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-sage-700 mb-2">
-                  <Leaf className="w-4 h-4 inline mr-1.5" />
-                  叶片状态
-                </label>
-                <select
-                  value={leafStatus}
-                  onChange={(e) => setLeafStatus(e.target.value as LeafStatus)}
-                  className="w-full px-4 py-3 bg-white border border-sage-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-sage-400 focus:border-transparent transition-all"
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => batchSetWatered(true)}
+                  className="flex-1 flex items-center justify-center gap-2 px-3 py-2.5 bg-blue-50 border border-blue-200 rounded-xl text-sm text-blue-700 hover:bg-blue-100 transition-colors"
                 >
-                  <option value="">未记录</option>
-                  {Object.entries(LEAF_STATUS_LABELS)
-                    .filter(([key]) => key !== '')
-                    .map(([key, label]) => (
-                      <option key={key} value={key}>
-                        {label}
-                      </option>
-                    ))}
-                </select>
+                  <Droplets className="w-4 h-4" />
+                  全部浇水
+                </button>
+                <button
+                  type="button"
+                  onClick={() => batchSetFertilized(true)}
+                  className="flex-1 flex items-center justify-center gap-2 px-3 py-2.5 bg-green-50 border border-green-200 rounded-xl text-sm text-green-700 hover:bg-green-100 transition-colors"
+                >
+                  <Sprout className="w-4 h-4" />
+                  全部施肥
+                </button>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-sage-700 mb-2">
-                  备注
-                </label>
-                <textarea
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  placeholder="统一的备注说明..."
-                  rows={3}
-                  className="w-full px-4 py-3 bg-white border border-sage-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-sage-400 focus:border-transparent transition-all resize-none"
-                />
+              <div className="space-y-3 max-h-[52vh] overflow-y-auto pr-1">
+                {Array.from(entries.values()).map((entry) => {
+                  const plant = plants.find((p) => p.id === entry.plantId);
+                  if (!plant) return null;
+                  const modified = isEntryModified(entry);
+                  return (
+                    <div
+                      key={entry.plantId}
+                      className={`p-4 rounded-xl border transition-all ${
+                        modified
+                          ? 'bg-white border-sage-300 shadow-sm'
+                          : 'bg-sage-50/50 border-sage-200'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-3">
+                        <div>
+                          <div className="font-medium text-sage-800 text-sm">{plant.name}</div>
+                          <div className="text-xs text-sage-400">{plant.species}</div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {modified && (
+                            <button
+                              type="button"
+                              onClick={() => resetEntryToPrefill(entry.plantId)}
+                              className="text-xs text-sage-400 hover:text-sage-600 flex items-center gap-1 transition-colors"
+                            >
+                              <RotateCcw className="w-3 h-3" />
+                              重置
+                            </button>
+                          )}
+                          <span
+                            className={`text-xs px-2 py-0.5 rounded-full ${
+                              modified
+                                ? 'bg-sage-100 text-sage-600'
+                                : 'bg-sage-50 text-sage-400'
+                            }`}
+                          >
+                            {modified ? '已修改' : '未修改'}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex gap-4 mb-3">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={entry.watered}
+                            onChange={(e) => updateEntry(entry.plantId, { watered: e.target.checked })}
+                            className="w-4 h-4 rounded border-sage-300 text-blue-500 focus:ring-blue-400"
+                          />
+                          <Droplets className={`w-4 h-4 ${entry.watered ? 'text-blue-500' : 'text-sage-300'}`} />
+                          <span className={`text-sm ${entry.watered ? 'text-blue-600' : 'text-sage-500'}`}>浇水</span>
+                        </label>
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={entry.fertilized}
+                            onChange={(e) => updateEntry(entry.plantId, { fertilized: e.target.checked })}
+                            className="w-4 h-4 rounded border-sage-300 text-green-500 focus:ring-green-400"
+                          />
+                          <Sprout className={`w-4 h-4 ${entry.fertilized ? 'text-green-500' : 'text-sage-300'}`} />
+                          <span className={`text-sm ${entry.fertilized ? 'text-green-600' : 'text-sage-500'}`}>施肥</span>
+                        </label>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs text-sage-500 mb-1">
+                            <Leaf className="w-3 h-3 inline mr-1" />
+                            叶片状态
+                          </label>
+                          <select
+                            value={entry.leafStatus}
+                            onChange={(e) => updateEntry(entry.plantId, { leafStatus: e.target.value as LeafStatus })}
+                            className="w-full px-2.5 py-1.5 text-sm bg-white border border-sage-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-sage-400 transition-all"
+                          >
+                            <option value="">未记录</option>
+                            {Object.entries(LEAF_STATUS_LABELS)
+                              .filter(([key]) => key !== '')
+                              .map(([key, label]) => (
+                                <option key={key} value={key}>
+                                  {label}
+                                </option>
+                              ))}
+                          </select>
+                          {entry.prefilledLeafStatus && entry.leafStatus === entry.prefilledLeafStatus && (
+                            <span className="text-xs text-sage-300 mt-0.5 block">按上次预填</span>
+                          )}
+                        </div>
+                        <div>
+                          <label className="block text-xs text-sage-500 mb-1">
+                            <Ruler className="w-3 h-3 inline mr-1" />
+                            高度 (cm)
+                          </label>
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.1"
+                            value={entry.height || ''}
+                            onChange={(e) => updateEntry(entry.plantId, { height: parseFloat(e.target.value) || 0 })}
+                            placeholder="0"
+                            className="w-full px-2.5 py-1.5 text-sm bg-white border border-sage-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-sage-400 transition-all"
+                          />
+                          {entry.prefilledHeight > 0 && entry.height === entry.prefilledHeight && (
+                            <span className="text-xs text-sage-300 mt-0.5 block">按上次预填</span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="mt-3">
+                        <input
+                          type="text"
+                          value={entry.notes}
+                          onChange={(e) => updateEntry(entry.plantId, { notes: e.target.value })}
+                          placeholder="备注（可选）"
+                          className="w-full px-2.5 py-1.5 text-sm bg-white border border-sage-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-sage-400 transition-all"
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
+
+              {modifiedCount === 0 && (
+                <div className="text-center py-3 text-sage-400 text-sm">
+                  请至少为一盆植物勾选浇水/施肥或修改叶片状态和高度
+                </div>
+              )}
             </div>
           )}
 
@@ -322,16 +518,10 @@ export function BatchRecordForm({ isOpen, onClose }: BatchRecordFormProps) {
                 <div className="flex items-center justify-between">
                   <div>
                     <div className="font-medium text-sage-800">
-                      {date} · 共 {previews.length} 条记录
+                      {date} · 共 {previews.length} 条有变更的记录
                     </div>
                     <div className="text-sm text-sage-500 mt-1">
-                      {watered && <span className="mr-3">💧 浇水</span>}
-                      {fertilized && <span className="mr-3">🌱 施肥</span>}
-                      {leafStatus && <span className="mr-3">🍃 {LEAF_STATUS_LABELS[leafStatus]}</span>}
-                      {notes && <span>📝 {notes}</span>}
-                      {!watered && !fertilized && !leafStatus && !notes && (
-                        <span className="text-sage-400">仅创建记录</span>
-                      )}
+                      未修改的植物已自动跳过
                     </div>
                   </div>
                 </div>
@@ -351,53 +541,89 @@ export function BatchRecordForm({ isOpen, onClose }: BatchRecordFormProps) {
                 </div>
               )}
 
-              <div className="space-y-2 max-h-72 overflow-y-auto pr-2">
-                {previews.map((preview) => (
-                  <div
-                    key={preview.plant.id}
-                    className={`flex items-center gap-3 p-3 rounded-xl border transition-all ${
-                      preview.isDuplicate
-                        ? preview.willSkip
-                          ? 'bg-amber-50 border-amber-200'
-                          : 'bg-amber-50 border-amber-400'
-                        : 'bg-white border-sage-200'
-                    }`}
-                  >
-                    {preview.isDuplicate && (
-                      <input
-                        type="checkbox"
-                        checked={preview.willSkip}
-                        onChange={() => toggleSkip(preview.plant.id)}
-                        className="w-5 h-5 rounded border-amber-300 text-amber-600 focus:ring-amber-500"
-                        title="勾选则跳过创建"
-                      />
-                    )}
-                    <div className="flex-1">
-                      <div className="font-medium text-sage-800">
-                        {preview.plant.name}
-                      </div>
-                      <div className="text-sm text-sage-500">
-                        {preview.plant.species} · {preview.plant.location}
+              {previews.length === 0 ? (
+                <div className="text-center py-8 text-sage-400">
+                  没有需要提交的记录
+                </div>
+              ) : (
+                <div className="space-y-2 max-h-72 overflow-y-auto pr-2">
+                  {previews.map((preview) => (
+                    <div
+                      key={preview.plant.id}
+                      className={`p-3 rounded-xl border transition-all ${
+                        preview.isDuplicate
+                          ? preview.willSkip
+                            ? 'bg-amber-50 border-amber-200'
+                            : 'bg-amber-50 border-amber-400'
+                          : 'bg-white border-sage-200'
+                      }`}
+                    >
+                      <div className="flex items-start gap-3">
+                        {preview.isDuplicate && (
+                          <input
+                            type="checkbox"
+                            checked={preview.willSkip}
+                            onChange={() => toggleSkip(preview.plant.id)}
+                            className="w-5 h-5 mt-0.5 rounded border-amber-300 text-amber-600 focus:ring-amber-500"
+                            title="勾选则跳过创建"
+                          />
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium text-sage-800">{preview.plant.name}</span>
+                            {preview.isDuplicate ? (
+                              <span
+                                className={`text-xs px-2 py-0.5 rounded-full ${
+                                  preview.willSkip
+                                    ? 'bg-sage-100 text-sage-600'
+                                    : 'bg-amber-100 text-amber-700'
+                                }`}
+                              >
+                                {preview.willSkip ? '将跳过' : '重复，将创建'}
+                              </span>
+                            ) : (
+                              <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700">
+                                将创建
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-sm text-sage-500 mt-1 flex flex-wrap gap-x-3 gap-y-1">
+                            {preview.entry.watered && (
+                              <span className="flex items-center gap-1">
+                                <Droplets className="w-3.5 h-3.5 text-blue-500" />
+                                浇水
+                              </span>
+                            )}
+                            {preview.entry.fertilized && (
+                              <span className="flex items-center gap-1">
+                                <Sprout className="w-3.5 h-3.5 text-green-500" />
+                                施肥
+                              </span>
+                            )}
+                            {preview.entry.leafStatus && (
+                              <span className="flex items-center gap-1">
+                                <Leaf className="w-3.5 h-3.5 text-green-400" />
+                                {LEAF_STATUS_LABELS[preview.entry.leafStatus]}
+                              </span>
+                            )}
+                            {preview.entry.height > 0 && (
+                              <span className="flex items-center gap-1">
+                                <Ruler className="w-3.5 h-3.5 text-sage-400" />
+                                {preview.entry.height}cm
+                              </span>
+                            )}
+                          </div>
+                          {preview.entry.notes && (
+                            <div className="text-xs text-sage-400 mt-1 truncate">
+                              {preview.entry.notes}
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
-                    {preview.isDuplicate ? (
-                      <span
-                        className={`text-xs px-2.5 py-1 rounded-full ${
-                          preview.willSkip
-                            ? 'bg-sage-100 text-sage-600'
-                            : 'bg-amber-100 text-amber-700'
-                        }`}
-                      >
-                        {preview.willSkip ? '将跳过' : '重复，将创建'}
-                      </span>
-                    ) : (
-                      <span className="text-xs px-2.5 py-1 rounded-full bg-green-100 text-green-700">
-                        将创建
-                      </span>
-                    )}
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
 
               <div className="text-sm text-sage-500 text-center">
                 将创建 {previews.filter((p) => !p.willSkip).length} 条新记录
@@ -439,7 +665,8 @@ export function BatchRecordForm({ isOpen, onClose }: BatchRecordFormProps) {
               <button
                 type="button"
                 onClick={goToPreview}
-                className="flex-1 px-4 py-3 bg-sage-500 text-white rounded-xl hover:bg-sage-600 transition-colors"
+                disabled={modifiedCount === 0}
+                className="flex-1 px-4 py-3 bg-sage-500 text-white rounded-xl hover:bg-sage-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 预览并提交
               </button>
