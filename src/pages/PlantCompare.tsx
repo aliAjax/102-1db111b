@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, GitCompare, Calendar, Droplets, AlertTriangle, TrendingUp, Sprout, CheckCircle2, XCircle, Info } from 'lucide-react';
+import { ArrowLeft, GitCompare, Calendar, Droplets, AlertTriangle, TrendingUp, Sprout, CheckCircle2, XCircle, Info, SlidersHorizontal, ArrowUpDown, Eye, EyeOff, ClipboardList } from 'lucide-react';
 import { usePlantStore } from '../store/usePlantStore';
 import type { Plant } from '../types';
 
@@ -29,6 +29,49 @@ interface PlantCompareData {
   stabilityScore: number;
   stabilityLevel: 'excellent' | 'good' | 'fair' | 'poor' | 'insufficient';
   dataQualityNote: string;
+}
+
+type DimensionKey = 'growthSpeed' | 'wateringRegularity' | 'leafAbnormalRate' | 'recordCompleteness';
+
+type SortDimension = DimensionKey | 'stability';
+
+const ALL_DIMENSIONS: DimensionKey[] = ['growthSpeed', 'wateringRegularity', 'leafAbnormalRate', 'recordCompleteness'];
+
+const DIMENSION_LABELS: Record<DimensionKey, string> = {
+  growthSpeed: '生长速度',
+  wateringRegularity: '浇水规律',
+  leafAbnormalRate: '叶片异常率',
+  recordCompleteness: '记录完整度',
+};
+
+const SORT_OPTIONS: { key: SortDimension; label: string }[] = [
+  { key: 'stability', label: '综合稳定性' },
+  { key: 'growthSpeed', label: '生长速度' },
+  { key: 'wateringRegularity', label: '浇水规律' },
+  { key: 'leafAbnormalRate', label: '叶片异常率' },
+  { key: 'recordCompleteness', label: '记录完整度' },
+];
+
+function getDimensionSortValue(data: PlantCompareData, dimension: SortDimension): number {
+  if (data.hasNoData) return -Infinity;
+
+  switch (dimension) {
+    case 'stability':
+      return data.stabilityScore;
+    case 'growthSpeed':
+      return data.heightGrowthRate ?? -Infinity;
+    case 'wateringRegularity': {
+      if (data.waterFrequency === null) return -Infinity;
+      const expectedFreq = 1 / (data.plant.wateringInterval || 7);
+      if (expectedFreq === 0) return -Infinity;
+      const ratio = data.waterFrequency / expectedFreq;
+      return 1 - Math.min(Math.abs(1 - ratio), 1);
+    }
+    case 'leafAbnormalRate':
+      return data.leafAbnormalRate !== null ? 1 - data.leafAbnormalRate : -Infinity;
+    case 'recordCompleteness':
+      return Math.min(data.recordDensity, 1);
+  }
 }
 
 function getDaysBetween(start: string, end: string): number {
@@ -151,6 +194,8 @@ export function PlantCompare() {
   const { plants, records, loadAllData } = usePlantStore();
   const [selectedPlantIds, setSelectedPlantIds] = useState<string[]>([]);
   const [dateRangeDays, setDateRangeDays] = useState<number>(30);
+  const [hiddenDimensions, setHiddenDimensions] = useState<Set<DimensionKey>>(new Set());
+  const [sortDimension, setSortDimension] = useState<SortDimension>('stability');
 
   useEffect(() => {
     loadAllData();
@@ -257,11 +302,15 @@ export function PlantCompare() {
         stabilityLevel: stability.level,
       };
     }).sort((a, b) => {
-      if (a.stabilityLevel === 'insufficient' && b.stabilityLevel !== 'insufficient') return 1;
-      if (b.stabilityLevel === 'insufficient' && a.stabilityLevel !== 'insufficient') return -1;
+      const aVal = getDimensionSortValue(a, sortDimension);
+      const bVal = getDimensionSortValue(b, sortDimension);
+      if (aVal === -Infinity && bVal !== -Infinity) return 1;
+      if (bVal === -Infinity && aVal !== -Infinity) return -1;
+      if (aVal === -Infinity && bVal === -Infinity) return b.stabilityScore - a.stabilityScore;
+      if (aVal !== bVal) return bVal - aVal;
       return b.stabilityScore - a.stabilityScore;
     });
-  }, [selectedPlantIds, dateRangeDays, plants, records]);
+  }, [selectedPlantIds, dateRangeDays, plants, records, sortDimension]);
 
   const togglePlantSelection = (plantId: string) => {
     setSelectedPlantIds(prev => {
@@ -279,6 +328,18 @@ export function PlantCompare() {
 
   const clearSelection = () => {
     setSelectedPlantIds([]);
+  };
+
+  const toggleDimension = (dim: DimensionKey) => {
+    setHiddenDimensions(prev => {
+      const next = new Set(prev);
+      if (next.has(dim)) {
+        next.delete(dim);
+      } else {
+        next.add(dim);
+      }
+      return next;
+    });
   };
 
   const getStabilityColor = (level: PlantCompareData['stabilityLevel']): string => {
@@ -430,6 +491,68 @@ export function PlantCompare() {
           )}
         </div>
 
+        {selectedPlantIds.length > 0 && (
+          <div className="bg-white rounded-2xl p-6 shadow-sm border border-sage-100 animate-fade-in animate-stagger-2">
+            <div className="flex items-center gap-2 mb-4">
+              <SlidersHorizontal className="w-5 h-5 text-sage-500" />
+              <h2 className="text-lg font-serif text-sage-800">对比控制</h2>
+            </div>
+            <div className="space-y-5">
+              <div>
+                <div className="flex items-center gap-2 mb-3">
+                  <ArrowUpDown className="w-4 h-4 text-sage-400" />
+                  <span className="text-sm font-medium text-sage-700">排序方式</span>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {SORT_OPTIONS.map(option => (
+                    <button
+                      key={option.key}
+                      onClick={() => setSortDimension(option.key)}
+                      className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${
+                        sortDimension === option.key
+                          ? 'bg-sage-500 text-white'
+                          : 'bg-sage-50 text-sage-600 hover:bg-sage-100'
+                      }`}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <div className="flex items-center gap-2 mb-3">
+                  <Eye className="w-4 h-4 text-sage-400" />
+                  <span className="text-sm font-medium text-sage-700">显示维度</span>
+                  <span className="text-xs text-sage-400">（点击切换显示/隐藏）</span>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {ALL_DIMENSIONS.map(dim => {
+                    const isHidden = hiddenDimensions.has(dim);
+                    return (
+                      <button
+                        key={dim}
+                        onClick={() => toggleDimension(dim)}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm transition-colors ${
+                          isHidden
+                            ? 'bg-sage-50 text-sage-400 line-through'
+                            : 'bg-sage-100 text-sage-700'
+                        }`}
+                      >
+                        {isHidden ? (
+                          <EyeOff className="w-3.5 h-3.5" />
+                        ) : (
+                          <Eye className="w-3.5 h-3.5" />
+                        )}
+                        {DIMENSION_LABELS[dim]}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {selectedPlantIds.length === 0 ? (
           <div className="text-center py-20 animate-fade-in animate-stagger-2">
             <div className="w-20 h-20 bg-sage-100 rounded-2xl flex items-center justify-center mx-auto mb-6">
@@ -441,9 +564,17 @@ export function PlantCompare() {
         ) : (
           <>
             <div className="bg-white rounded-2xl p-6 shadow-sm border border-sage-100 animate-fade-in animate-stagger-2">
-              <div className="flex items-center gap-2 mb-5">
-                <CheckCircle2 className="w-5 h-5 text-sage-500" />
-                <h2 className="text-lg font-serif text-sage-800">养护稳定性排名</h2>
+              <div className="flex items-center justify-between mb-5">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="w-5 h-5 text-sage-500" />
+                  <h2 className="text-lg font-serif text-sage-800">养护稳定性排名</h2>
+                </div>
+                {sortDimension !== 'stability' && (
+                  <span className="text-xs text-sage-400 flex items-center gap-1">
+                    <ArrowUpDown className="w-3 h-3" />
+                    按{SORT_OPTIONS.find(o => o.key === sortDimension)?.label}排序
+                  </span>
+                )}
               </div>
               <div className="space-y-3">
                 {compareData.map((data, index) => (
@@ -535,6 +666,7 @@ export function PlantCompare() {
               </div>
             </div>
 
+            {!hiddenDimensions.has('growthSpeed') && (
             <div className="bg-white rounded-2xl p-6 shadow-sm border border-sage-100 animate-fade-in animate-stagger-3">
               <div className="flex items-center gap-2 mb-5">
                 <TrendingUp className="w-5 h-5 text-sage-500" />
@@ -575,7 +707,9 @@ export function PlantCompare() {
                 ))}
               </div>
             </div>
+            )}
 
+            {!hiddenDimensions.has('wateringRegularity') && (
             <div className="bg-white rounded-2xl p-6 shadow-sm border border-sage-100 animate-fade-in animate-stagger-4">
               <div className="flex items-center gap-2 mb-5">
                 <Droplets className="w-5 h-5 text-blue-500" />
@@ -632,7 +766,9 @@ export function PlantCompare() {
                 })}
               </div>
             </div>
+            )}
 
+            {!hiddenDimensions.has('leafAbnormalRate') && (
             <div className="bg-white rounded-2xl p-6 shadow-sm border border-sage-100 animate-fade-in animate-stagger-5">
               <div className="flex items-center gap-2 mb-5">
                 <AlertTriangle className="w-5 h-5 text-amber-500" />
@@ -709,8 +845,74 @@ export function PlantCompare() {
                 })}
               </div>
             </div>
+            )}
 
-            <div className="bg-gradient-to-r from-sage-50 to-cream-100 rounded-2xl p-6 border border-sage-100 animate-fade-in animate-stagger-6">
+            {!hiddenDimensions.has('recordCompleteness') && (
+            <div className="bg-white rounded-2xl p-6 shadow-sm border border-sage-100 animate-fade-in animate-stagger-6">
+              <div className="flex items-center gap-2 mb-5">
+                <ClipboardList className="w-5 h-5 text-sage-500" />
+                <h2 className="text-lg font-serif text-sage-800">记录完整度对比</h2>
+              </div>
+              <div className="space-y-4">
+                {compareData.map(data => {
+                  const completenessPercent = Math.min(Math.round(data.recordDensity * 100), 100);
+                  return (
+                    <div key={data.plantId} className="flex items-center gap-4">
+                      <div className="w-28 flex-shrink-0 truncate text-sm text-sage-700">
+                        {data.plantName}
+                      </div>
+                      <div className="flex-1 h-8 bg-sage-50 rounded-full overflow-hidden flex items-center">
+                        {data.hasNoData ? (
+                          <div className="px-4 text-sm text-sage-400">
+                            无记录
+                          </div>
+                        ) : (
+                          <div
+                            className="h-full rounded-full transition-all duration-700 flex items-center justify-end pr-3"
+                            style={{
+                              width: `${Math.max(completenessPercent, 5)}%`,
+                              backgroundColor: completenessPercent >= 70
+                                ? '#7D9469'
+                                : completenessPercent >= 40
+                                ? '#D4A843'
+                                : '#C46F42',
+                              minWidth: '60px',
+                            }}
+                          >
+                            <span className="text-xs text-white font-medium">
+                              {completenessPercent}%
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                      <div className="w-32 flex-shrink-0 text-right">
+                        {!data.hasNoData ? (
+                          <div>
+                            <span className={`text-sm font-medium ${
+                              completenessPercent >= 70
+                                ? 'text-sage-600'
+                                : completenessPercent >= 40
+                                ? 'text-amber-500'
+                                : 'text-terracotta-500'
+                            }`}>
+                              {data.totalRecords} 条记录
+                            </span>
+                            <div className="text-xs text-sage-400">
+                              {data.hasSparseData ? '记录较稀疏' : '记录较完整'}
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="text-xs text-sage-400">无法计算</div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+            )}
+
+            <div className="bg-gradient-to-r from-sage-50 to-cream-100 rounded-2xl p-6 border border-sage-100 animate-fade-in animate-stagger-7">
               <div className="flex items-start gap-3">
                 <div className="w-10 h-10 bg-sage-100 rounded-xl flex items-center justify-center flex-shrink-0">
                   <Info className="w-5 h-5 text-sage-600" />
