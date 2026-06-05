@@ -21,7 +21,6 @@ interface PlantCompareData {
 
   waterCount: number;
   waterFrequency: number | null;
-  wateringRegularityScore: number | null;
 
   leafAbnormalCount: number;
   leafHealthyCount: number;
@@ -62,7 +61,7 @@ function getDimensionSortValue(data: PlantCompareData, dimension: SortDimension)
     case 'growthSpeed':
       return data.heightGrowthRate ?? -Infinity;
     case 'wateringRegularity':
-      return data.wateringRegularityScore ?? -Infinity;
+      return data.waterFrequency ?? -Infinity;
     case 'leafAbnormalRate':
       return data.leafAbnormalRate !== null ? 1 - data.leafAbnormalRate : -Infinity;
     case 'recordCompleteness':
@@ -247,30 +246,6 @@ export function PlantCompare() {
       const waterCount = filteredRecords.filter(r => r.watered).length;
       const waterFrequency = totalDays > 0 ? waterCount / totalDays : null;
 
-      let wateringRegularityScore: number | null = null;
-      if (waterCount >= 2) {
-        const wateringDates = filteredRecords
-          .filter(r => r.watered)
-          .map(r => r.date)
-          .sort();
-        if (wateringDates.length >= 2) {
-          const intervals: number[] = [];
-          for (let i = 1; i < wateringDates.length; i++) {
-            const days = getDaysBetween(wateringDates[i - 1], wateringDates[i]) - 1;
-            if (days > 0) intervals.push(days);
-          }
-          if (intervals.length > 0) {
-            const mean = intervals.reduce((s, v) => s + v, 0) / intervals.length;
-            if (mean > 0) {
-              const variance = intervals.reduce((s, v) => s + (v - mean) ** 2, 0) / intervals.length;
-              const stdDev = Math.sqrt(variance);
-              const cv = stdDev / mean;
-              wateringRegularityScore = Math.max(0, Math.min(1, 1 - cv));
-            }
-          }
-        }
-      }
-
       const leafAbnormalCount = filteredRecords.filter(r => r.leafStatus === 'yellowing' || r.leafStatus === 'wilting').length;
       const leafHealthyCount = filteredRecords.filter(r => r.leafStatus === 'healthy' || r.leafStatus === 'new_growth').length;
       const totalLeafRecords = leafAbnormalCount + leafHealthyCount;
@@ -308,7 +283,6 @@ export function PlantCompare() {
         heightGrowthRate,
         waterCount,
         waterFrequency,
-        wateringRegularityScore,
         leafAbnormalCount,
         leafHealthyCount,
         leafAbnormalRate,
