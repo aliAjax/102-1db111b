@@ -405,7 +405,7 @@ export const calculateNextCare = (
     const latestSkipTime = new Date(latestSkip.deferredToDate || latestSkip.scheduledDate).getTime();
     const lastCareTime = lastCareDate ? new Date(lastCareDate).getTime() : 0;
 
-    if (lastCareTime >= latestSkipTime) {
+    if (lastCareTime > latestSkipTime) {
       baseDate = lastCareDate!;
       const baseTime = new Date(baseDate).getTime();
       nextDate = new Date(baseTime + interval * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
