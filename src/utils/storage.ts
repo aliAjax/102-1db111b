@@ -37,7 +37,7 @@ export const saveData = (data: AppData): void => {
   }
 };
 
-export const addPlant = (plant: Omit<Plant, 'id' | 'createdAt'>): Plant => {
+export const addPlant = (plant: Omit<Plant, 'id' | 'createdAt' | 'wateringInterval' | 'fertilizingInterval'> & Partial<Pick<Plant, 'wateringInterval' | 'fertilizingInterval'>>): Plant => {
   const data = loadData();
   const newPlant: Plant = {
     wateringInterval: 7,

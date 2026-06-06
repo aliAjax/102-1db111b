@@ -28,7 +28,20 @@ export default defineConfig({
     tsconfigPaths()
   ],
   test: {
-    environment: 'node',
-    include: ['src/**/*.test.ts'],
+    environment: 'jsdom',
+    include: ['src/**/*.{test,spec}.{ts,tsx}'],
+    globals: true,
+    setupFiles: ['./src/test/setup.ts'],
+    environmentOptions: {
+      jsdom: {
+        url: 'http://localhost:5173',
+      },
+    },
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'json', 'html'],
+      include: ['src/**/*.{ts,tsx}'],
+      exclude: ['src/**/*.d.ts', 'src/**/test/**', 'src/main.tsx'],
+    },
   },
 })
