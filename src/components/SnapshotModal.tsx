@@ -8,8 +8,8 @@ import {
   deleteSnapshot,
   calculateSnapshotDiff,
   restoreSnapshot,
-  loadData,
-} from '../utils/storage';
+} from '../utils/snapshots';
+import { loadData } from '../utils/localData';
 
 interface SnapshotModalProps {
   isOpen: boolean;

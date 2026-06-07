@@ -2,7 +2,8 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { X, Check, Calendar, Leaf, Droplets, Sprout, AlertTriangle, Ruler, RotateCcw } from 'lucide-react';
 import type { LeafStatus, PlantRecord, Plant } from '../types';
 import { usePlantStore } from '../store/usePlantStore';
-import { getTodayString, getRecordsByDate, getRecordsByPlantId } from '../utils/storage';
+import { getTodayString } from '../utils/common';
+import { getRecordsByDate, getRecordsByPlantId } from '../utils/localData';
 import { LEAF_STATUS_LABELS } from '../types';
 
 interface BatchRecordFormProps {

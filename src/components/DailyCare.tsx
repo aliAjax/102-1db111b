@@ -1,7 +1,7 @@
 import { Droplets, Leaf, Check, Calendar, Sparkles, SkipForward, Clock, X } from 'lucide-react';
 import { useState } from 'react';
 import { usePlantStore, type CareTask } from '../store/usePlantStore';
-import { getTodayString } from '../utils/storage';
+import { getTodayString } from '../utils/common';
 import { SEASON_LABELS } from '../types';
 
 export function DailyCare() {

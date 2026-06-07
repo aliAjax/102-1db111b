@@ -1,6 +1,7 @@
 import type { Plant, PlantRecord, Warning, WarningType, WarningSeverity } from '../types';
 import { WARNING_TYPE_LABELS } from '../types';
-import { generateId, getTodayString, getCareInterval, getCurrentSeason } from './storage';
+import { generateId, getTodayString } from './common';
+import { getCareInterval, getCurrentSeason } from './carePlan';
 
 interface WarningRule {
   type: WarningType;

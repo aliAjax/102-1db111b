@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { calculateNextCare } from '../storage';
+import { calculateNextCare } from '../carePlan';
 import type { Plant, PlantRecord, CareSkip } from '../../types';
 
 const makePlant = (overrides: Partial<Plant> = {}): Plant => ({

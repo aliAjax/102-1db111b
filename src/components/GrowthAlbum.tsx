@@ -1,7 +1,8 @@
 import { useState, useRef, useMemo } from 'react';
 import { Camera, Plus, Trash2, X, ImagePlus, Droplets, Sparkles, Leaf, Ruler, Search } from 'lucide-react';
 import { usePlantStore } from '../store/usePlantStore';
-import { compressImage, getTodayString } from '../utils/storage';
+import { compressImage } from '../utils/photoStorage';
+import { getTodayString } from '../utils/common';
 import { LEAF_STATUS_LABELS } from '../types';
 import type { PlantRecord, GrowthPhoto } from '../types';
 

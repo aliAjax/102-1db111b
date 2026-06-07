@@ -1,6 +1,6 @@
 import { vi } from 'vitest';
 import type { Plant, PlantRecord, AppData, CareSkip, GrowthPhoto } from '../types';
-import { generateId } from '../utils/storage';
+import { generateId } from '../utils/common';
 
 export const createMockPlant = (overrides: Partial<Plant> = {}): Plant => ({
   id: `plant-${generateId()}`,

@@ -3,7 +3,7 @@ import { X, Droplets, Leaf, Sun, CloudRain, Snowflake } from 'lucide-react';
 import type { Plant, Season, SeasonalInterval, CarePlan } from '../types';
 import { SEASON_LABELS } from '../types';
 import { usePlantStore } from '../store/usePlantStore';
-import { getCurrentSeason } from '../utils/storage';
+import { getCurrentSeason } from '../utils/carePlan';
 
 interface CarePlanFormProps {
   isOpen: boolean;

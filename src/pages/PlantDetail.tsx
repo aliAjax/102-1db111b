@@ -15,7 +15,7 @@ import { WarningDetailModal } from '../components/WarningDetailModal';
 import type { PlantRecord } from '../types';
 import { WARNING_SEVERITY_LABELS } from '../types';
 import { SEASON_LABELS } from '../types';
-import { getCurrentSeason, getCareInterval } from '../utils/storage';
+import { getCurrentSeason, getCareInterval } from '../utils/carePlan';
 
 export function PlantDetail() {
   const { id } = useParams<{ id: string }>();

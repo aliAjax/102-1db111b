@@ -1,7 +1,7 @@
 import { MapPin, Calendar, Droplets, ChevronDown, ChevronRight } from 'lucide-react';
 import { useState } from 'react';
 import { PlantCard } from './PlantCard';
-import { getTodayString } from '../utils/storage';
+import { getTodayString } from '../utils/common';
 import type { Plant, PlantRecord } from '../types';
 
 interface LocationViewProps {

@@ -7,7 +7,7 @@ import {
   getImportPreview,
   mergeImportData,
   type ImportPreview,
-} from '../utils/storage';
+} from '../utils/importExport';
 
 interface ImportExportModalProps {
   isOpen: boolean;

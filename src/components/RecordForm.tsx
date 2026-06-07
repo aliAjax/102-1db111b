@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import type { LeafStatus, PlantRecord } from '../types';
 import { usePlantStore } from '../store/usePlantStore';
-import { getTodayString } from '../utils/storage';
+import { getTodayString } from '../utils/common';
 import { LEAF_STATUS_LABELS } from '../types';
 
 interface RecordFormProps {

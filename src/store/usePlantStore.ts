@@ -9,15 +9,17 @@ import {
   updateRecord as storageUpdateRecord,
   deleteRecord as storageDeleteRecord,
   getRecordsByPlantId,
-  getTodayString,
+  addCareSkip as storageAddCareSkip,
+  deleteCareSkipsByPlantId as storageDeleteCareSkipsByPlantId,
+} from '../utils/localData';
+import {
   addGrowthPhoto as storageAddGrowthPhoto,
   getGrowthPhotosByPlantId as storageGetGrowthPhotos,
   deleteGrowthPhoto as storageDeleteGrowthPhoto,
   deleteGrowthPhotosByPlantId as storageDeleteGrowthPhotosByPlantId,
-  addCareSkip as storageAddCareSkip,
-  deleteCareSkipsByPlantId as storageDeleteCareSkipsByPlantId,
-  calculateNextCare,
-} from '../utils/storage';
+} from '../utils/photoStorage';
+import { calculateNextCare } from '../utils/carePlan';
+import { getTodayString } from '../utils/common';
 import { evaluatePlantWarnings } from '../utils/warningEngine';
 
 export interface CareTask {

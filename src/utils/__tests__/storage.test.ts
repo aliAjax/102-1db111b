@@ -12,27 +12,35 @@ import {
   getRecordsByDate,
   getPlantById,
   getAllPlants,
-  exportData,
-  validateImportData,
-  getImportPreview,
-  mergeImportData,
-  getCurrentSeason,
-  getCareInterval,
   addCareSkip,
   getCareSkipsByPlantId,
   getAllCareSkips,
   deleteCareSkipsByPlantId,
+} from '../localData';
+import {
+  exportData,
+  validateImportData,
+  getImportPreview,
+  mergeImportData,
+} from '../importExport';
+import {
+  getCurrentSeason,
+  getCareInterval,
+} from '../carePlan';
+import {
   createSnapshot,
   loadSnapshots,
   deleteSnapshot,
   calculateSnapshotDiff,
   restoreSnapshot,
-  getTodayString,
+} from '../snapshots';
+import { getTodayString } from '../common';
+import {
   addGrowthPhoto,
   getGrowthPhotosByPlantId,
   deleteGrowthPhoto,
   deleteGrowthPhotosByPlantId,
-} from '../storage';
+} from '../photoStorage';
 import type { Plant, AppData } from '../../types';
 import { setMockDate, resetMockDate, createMockPlant, createMockRecord } from '../../test/testUtils';
 
