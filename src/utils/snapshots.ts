@@ -1,4 +1,4 @@
-import type { Snapshot, SnapshotDiff, AppData, Plant, PlantRecord } from '../types';
+import type { Snapshot, SnapshotDiff, AppData } from '../types';
 import { loadData, saveData } from './localData';
 import { generateId, getTodayString } from './common';
 
